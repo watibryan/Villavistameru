@@ -1,0 +1,348 @@
+import { useState, useEffect } from "react";
+
+// ── PALETTE ──────────────────────────────────────────────────
+const C = { ob:"#0D0F14",obM:"#161A23",obL:"#1E2330",gd:"#C9A84C",gdL:"#E8C96A",iv:"#F5F0E8",ivD:"#DDD5C4",mu:"#8A8FA0",ok:"#2ECC71",danger:"#E74C3C" };
+
+// ── TENANT LIST (names + ids only) ───────────────────────────
+const TENANTS = [
+  {id:1,  name:"Tash Aqua Lounge",        e:"🍹", cat:"Dining & Bar"},
+  {id:2,  name:"Chandarana FoodPlus",     e:"🛒", cat:"Supermarket"},
+  {id:3,  name:"KCB Bank",               e:"🏦", cat:"Banking"},
+  {id:4,  name:"Equity Bank",            e:"🏦", cat:"Banking"},
+  {id:5,  name:"Xiaomi",                 e:"📱", cat:"Electronics"},
+  {id:6,  name:"Killimall",              e:"📦", cat:"Electronics"},
+  {id:7,  name:"Gamelo Enterprises",     e:"🎮", cat:"Gaming"},
+  {id:8,  name:"Generations Electronics",e:"🖥",  cat:"Electronics"},
+  {id:9,  name:"Doctor Laundry",         e:"👔", cat:"Services"},
+  {id:10, name:"Otawa Farms",            e:"🥩", cat:"Fresh Produce"},
+  {id:11, name:"River Ranch",            e:"🔥", cat:"Outdoor Dining"},
+  {id:12, name:"Jajemelo",              e:"🍔", cat:"Fast Food"},
+  {id:13, name:"Trada Essence",          e:"🛍", cat:"Retail"},
+  {id:14, name:"Kainga Cutlery",         e:"🍴", cat:"Homewares"},
+  {id:15, name:"Ranch Butchers",         e:"🥩", cat:"Butchery"},
+  {id:16, name:"Leichana Ayieko & Co",  e:"⚖️", cat:"Legal"},
+  {id:17, name:"Car Wash",              e:"🚗", cat:"Automotive"},
+  {id:18, name:"Mormon Church",          e:"⛪", cat:"Community"},
+  {id:19, name:"Aura Spa & Wellness",   e:"✨", cat:"Wellness"},
+  {id:20, name:"KeMU Health Centre",    e:"🏥", cat:"Healthcare"},
+  {id:21, name:"Night Club",            e:"🎵", cat:"Nightlife"},
+  {id:22, name:"Jajemelo Parking",      e:"🅿️", cat:"Parking"},
+];
+
+const EMPTY_MS = (t) => ({
+  logo:"", accent:"#C9A84C", primary:"#0D1520",
+  about:"", hours:"", phone:"",
+  ig:"", fb:"", tw:"", tiktok:"", website:"",
+  offers:[{ title:"", desc:"", img:"", tag:"Members Only" }],
+});
+
+const STORAGE_KEY = (id) => `ms-${id}`;
+
+const CSS = `
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0D0F14;color:#F5F0E8;font-family:'Inter',sans-serif;font-weight:300;min-height:100vh}
+  input,textarea,select{background:#1E2330;border:1px solid rgba(201,168,76,.2);color:#F5F0E8;padding:9px 12px;font-family:inherit;font-size:13px;width:100%;outline:none;transition:border-color .2s;border-radius:2px}
+  input:focus,textarea:focus,select:focus{border-color:#C9A84C}
+  input::placeholder,textarea::placeholder{color:#8A8FA0}
+  label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#8A8FA0;display:block;margin-bottom:5px}
+  textarea{resize:vertical;min-height:80px}
+  ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:#0D0F14}::-webkit-scrollbar-thumb{background:#C9A84C}
+`;
+
+// ── UI ATOMS ─────────────────────────────────────────────────
+function Field({ label, children }) {
+  return <div style={{marginBottom:14}}><label>{label}</label>{children}</div>;
+}
+function Btn({ children, onClick, variant="gold", disabled }) {
+  const s = variant==="gold"
+    ? {background:C.gd,color:C.ob,border:"none"}
+    : variant==="danger"
+    ? {background:"transparent",color:C.danger,border:`1px solid ${C.danger}`}
+    : {background:"transparent",color:C.gd,border:`1px solid ${C.gd}`};
+  return <button onClick={onClick} disabled={disabled} style={{...s,padding:"9px 20px",fontFamily:"inherit",fontSize:11,fontWeight:600,letterSpacing:2,textTransform:"uppercase",cursor:disabled?"not-allowed":"pointer",opacity:disabled?.6:1}}>{children}</button>;
+}
+function Toast({ msg, type, onClose }) {
+  useEffect(()=>{ const t=setTimeout(onClose,3500); return ()=>clearTimeout(t); },[]);
+  return <div style={{position:"fixed",bottom:24,right:24,zIndex:999,background:type==="ok"?C.ok:C.danger,color:"white",padding:"12px 18px",fontSize:13,animation:"slideUp .3s ease"}}>{msg}</div>;
+}
+
+// ── OFFER EDITOR ROW ─────────────────────────────────────────
+function OfferRow({ offer, idx, onChange, onRemove }) {
+  const set = (k,v) => onChange(idx, {...offer, [k]:v});
+  return (
+    <div style={{background:C.ob,border:`1px solid rgba(201,168,76,.12)`,padding:14,marginBottom:10}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
+        <span style={{fontSize:11,color:C.mu,letterSpacing:1.5,textTransform:"uppercase"}}>Offer {idx+1}</span>
+        <Btn onClick={()=>onRemove(idx)} variant="danger">Remove</Btn>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+        <Field label="Title"><input value={offer.title} onChange={e=>set("title",e.target.value)} placeholder="e.g. Member Discount" /></Field>
+        <Field label="Tag"><input value={offer.tag} onChange={e=>set("tag",e.target.value)} placeholder="e.g. Members Only" /></Field>
+      </div>
+      <Field label="Description"><textarea value={offer.desc} onChange={e=>set("desc",e.target.value)} placeholder="Describe the offer..." /></Field>
+      <Field label="Offer Image URL (optional)">
+        <input value={offer.img} onChange={e=>set("img",e.target.value)} placeholder="https://example.com/image.jpg" />
+        {offer.img && <div style={{marginTop:8}}>
+          <img src={offer.img} alt="preview" style={{maxHeight:80,maxWidth:"100%",objectFit:"cover",display:"block"}} onError={e=>e.target.style.opacity=".3"} />
+          <span style={{fontSize:10,color:C.mu}}>Image preview above</span>
+        </div>}
+      </Field>
+    </div>
+  );
+}
+
+// ── MICROSITE EDITOR ─────────────────────────────────────────
+function MicrositeEditor({ tenant, onBack }) {
+  const [ms, setMs]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving]   = useState(false);
+  const [toast, setToast]     = useState(null);
+  const [preview, setPreview] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    window.storage.get(STORAGE_KEY(tenant.id))
+      .then(r => setMs(r ? JSON.parse(r.value) : EMPTY_MS(tenant)))
+      .catch(() => setMs(EMPTY_MS(tenant)))
+      .finally(() => setLoading(false));
+  }, [tenant.id]);
+
+  const set = (k, v) => setMs(m => ({...m, [k]:v}));
+
+  const setOffer = (idx, val) => setMs(m => {
+    const offers = [...(m.offers||[])]; offers[idx]=val; return {...m,offers};
+  });
+  const addOffer = () => setMs(m => ({...m, offers:[...(m.offers||[]), {title:"",desc:"",img:"",tag:"Members Only"}]}));
+  const removeOffer = idx => setMs(m => ({...m, offers:(m.offers||[]).filter((_,i)=>i!==idx)}));
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await window.storage.set(STORAGE_KEY(tenant.id), JSON.stringify(ms));
+      setToast({ msg:"Microsite saved successfully!", type:"ok" });
+    } catch {
+      setToast({ msg:"Save failed — try again.", type:"err" });
+    } finally { setSaving(false); }
+  };
+
+  const reset = async () => {
+    if (!window.confirm("Reset this microsite to defaults?")) return;
+    const fresh = EMPTY_MS(tenant);
+    setMs(fresh);
+    await window.storage.set(STORAGE_KEY(tenant.id), JSON.stringify(fresh));
+    setToast({ msg:"Reset to defaults.", type:"ok" });
+  };
+
+  if (loading) return <div style={{padding:40,color:C.mu,textAlign:"center"}}>Loading microsite data…</div>;
+
+  return (
+    <div>
+      {/* Toolbar */}
+      <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:28,flexWrap:"wrap"}}>
+        <button onClick={onBack} style={{background:"none",border:"none",color:C.mu,cursor:"pointer",fontSize:14}}>← All Tenants</button>
+        <div style={{fontFamily:"Georgia,serif",fontSize:20,color:C.iv,flex:1}}>{tenant.e} {tenant.name}</div>
+        <Btn onClick={()=>setPreview(p=>!p)} variant="outline">{preview?"Edit Mode":"Preview"}</Btn>
+        <Btn onClick={reset} variant="danger">Reset</Btn>
+        <Btn onClick={save} disabled={saving}>{saving?"Saving…":"Save Changes"}</Btn>
+      </div>
+
+      {preview ? (
+        // ── LIVE PREVIEW ──────────────────────────────────────
+        <div style={{background:C.obM,border:`1px solid ${ms.accent||C.gd}40`,maxWidth:640}}>
+          <div style={{background:ms.primary||C.obM,borderBottom:`2px solid ${ms.accent||C.gd}`,padding:"18px 22px",display:"flex",alignItems:"center",gap:14}}>
+            {ms.logo
+              ? <img src={ms.logo} alt={tenant.name} style={{width:52,height:52,objectFit:"contain",background:C.obL,padding:4,borderRadius:4}} onError={e=>e.target.style.display="none"} />
+              : <div style={{width:52,height:52,background:`${ms.accent||C.gd}18`,border:`1px solid ${ms.accent||C.gd}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,borderRadius:4}}>{tenant.e}</div>
+            }
+            <div>
+              <h3 style={{fontFamily:"Georgia,serif",fontSize:20,fontWeight:300,color:C.iv,marginBottom:4}}>{tenant.name}</h3>
+              <span style={{fontSize:10,letterSpacing:1.5,textTransform:"uppercase",color:C.mu}}>{tenant.cat}</span>
+            </div>
+          </div>
+          {ms.hours && <div style={{background:`${ms.accent||C.gd}12`,padding:"7px 22px",fontSize:12,color:C.ivD}}>🕐 {ms.hours}</div>}
+          <div style={{padding:"20px 22px"}}>
+            <p style={{fontSize:14,color:C.ivD,lineHeight:1.85,marginBottom:16}}>{ms.about}</p>
+            {ms.phone && <p style={{fontSize:12,color:C.mu,marginBottom:12}}>📞 {ms.phone}</p>}
+            <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:16}}>
+              {[["ig","Instagram","📸"],["fb","Facebook","👍"],["tw","Twitter","🐦"],["tiktok","TikTok","🎵"],["website","Website","🌐"]].filter(([k])=>ms[k]).map(([k,l,i])=>(
+                <span key={k} style={{fontSize:11,color:C.mu,padding:"5px 9px",background:C.obL,border:`1px solid rgba(201,168,76,.12)`}}>{i} {l}</span>
+              ))}
+            </div>
+            <div style={{fontSize:11,letterSpacing:2,textTransform:"uppercase",color:ms.accent||C.gd,marginBottom:12}}>Offers & Promotions</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              {(ms.offers||[]).map((o,i)=>(
+                <div key={i} style={{background:C.ob,border:`1px solid rgba(201,168,76,.1)`,overflow:"hidden"}}>
+                  {o.img && <img src={o.img} alt={o.title} style={{width:"100%",height:110,objectFit:"cover"}} onError={e=>e.target.style.display="none"} />}
+                  {!o.img && <div style={{height:70,background:`linear-gradient(135deg,${C.obL},${C.obM})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24}}>🎁</div>}
+                  <div style={{padding:"10px 12px"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",gap:6,marginBottom:4}}>
+                      <span style={{fontSize:13,fontWeight:500,color:C.iv}}>{o.title}</span>
+                      <span style={{fontSize:9,letterSpacing:1.5,textTransform:"uppercase",color:ms.accent||C.gd,background:`${ms.accent||C.gd}18`,border:`1px solid ${ms.accent||C.gd}40`,padding:"2px 5px",whiteSpace:"nowrap"}}>{o.tag}</span>
+                    </div>
+                    <p style={{fontSize:12,color:C.mu,lineHeight:1.6}}>{o.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (
+        // ── EDIT FORM ─────────────────────────────────────────
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,alignItems:"start"}}>
+          {/* Left: Identity */}
+          <div>
+            <div style={{fontSize:10,letterSpacing:2,textTransform:"uppercase",color:C.gd,marginBottom:16}}>Brand & Identity</div>
+            <div style={{background:C.obM,border:`1px solid rgba(201,168,76,.12)`,padding:18,marginBottom:16}}>
+              <Field label="Logo URL (PNG or SVG, transparent background)">
+                <input value={ms.logo||""} onChange={e=>set("logo",e.target.value)} placeholder="https://example.com/logo.png" />
+                {ms.logo && <img src={ms.logo} alt="logo preview" style={{maxHeight:60,maxWidth:"100%",marginTop:6,objectFit:"contain"}} onError={e=>e.target.style.opacity=".2"} />}
+              </Field>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <Field label="Accent Colour">
+                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                    <input type="color" value={ms.accent||"#C9A84C"} onChange={e=>set("accent",e.target.value)} style={{width:44,height:36,padding:2,cursor:"pointer",flex:"0 0 auto"}} />
+                    <input value={ms.accent||"#C9A84C"} onChange={e=>set("accent",e.target.value)} placeholder="#C9A84C" style={{flex:1}} />
+                  </div>
+                </Field>
+                <Field label="Header Background">
+                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                    <input type="color" value={ms.primary||"#0D1520"} onChange={e=>set("primary",e.target.value)} style={{width:44,height:36,padding:2,cursor:"pointer",flex:"0 0 auto"}} />
+                    <input value={ms.primary||"#0D1520"} onChange={e=>set("primary",e.target.value)} placeholder="#0D1520" style={{flex:1}} />
+                  </div>
+                </Field>
+              </div>
+            </div>
+
+            <div style={{fontSize:10,letterSpacing:2,textTransform:"uppercase",color:C.gd,marginBottom:16}}>Info</div>
+            <div style={{background:C.obM,border:`1px solid rgba(201,168,76,.12)`,padding:18,marginBottom:16}}>
+              <Field label="Opening Hours">
+                <input value={ms.hours||""} onChange={e=>set("hours",e.target.value)} placeholder="Mon–Sat 9am–7pm · Sun 10am–5pm" />
+              </Field>
+              <Field label="Public Phone (optional)">
+                <input value={ms.phone||""} onChange={e=>set("phone",e.target.value)} placeholder="+254 7XX XXX XXX" />
+              </Field>
+              <Field label="About / Description">
+                <textarea value={ms.about||""} onChange={e=>set("about",e.target.value)} placeholder="Full description shown in the About tab of this tenant's microsite." />
+              </Field>
+            </div>
+
+            <div style={{fontSize:10,letterSpacing:2,textTransform:"uppercase",color:C.gd,marginBottom:16}}>Social Media</div>
+            <div style={{background:C.obM,border:`1px solid rgba(201,168,76,.12)`,padding:18}}>
+              {[["ig","📸 Instagram handle","@username without @"],["fb","👍 Facebook page","page name or ID"],["tw","🐦 Twitter / X handle","@username without @"],["tiktok","🎵 TikTok handle","@username without @"],["website","🌐 Website URL","https://yoursite.com"]].map(([k,lbl,ph])=>(
+                <Field key={k} label={lbl}>
+                  <input value={ms[k]||""} onChange={e=>set(k,e.target.value)} placeholder={ph} />
+                </Field>
+              ))}
+            </div>
+          </div>
+
+          {/* Right: Offers */}
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+              <span style={{fontSize:10,letterSpacing:2,textTransform:"uppercase",color:C.gd}}>Offers & Promotions</span>
+              <Btn onClick={addOffer} variant="outline">+ Add Offer</Btn>
+            </div>
+            <p style={{fontSize:12,color:C.mu,marginBottom:14,lineHeight:1.7}}>
+              Each offer shows as a card in the Offers tab. Add an image URL for a visual header — leave blank for a default icon. Use the Tag field to label the offer type.
+            </p>
+            {(ms.offers||[]).map((o,i)=>(
+              <OfferRow key={i} offer={o} idx={i} onChange={setOffer} onRemove={removeOffer} />
+            ))}
+            {!(ms.offers||[]).length && (
+              <div style={{padding:"28px 0",textAlign:"center",color:C.mu,border:`1px dashed rgba(201,168,76,.2)`}}>
+                <div style={{fontSize:28,marginBottom:8}}>🎁</div>
+                <div style={{fontSize:13}}>No offers yet. Click + Add Offer to begin.</div>
+              </div>
+            )}
+            <div style={{marginTop:16,padding:"14px 16px",background:C.obM,border:`1px solid rgba(201,168,76,.1)`,fontSize:12,color:C.mu,lineHeight:1.7}}>
+              <strong style={{color:C.iv}}>Image tips:</strong> Use landscape images (16:9 ratio works best). Paste a direct image URL — Google Drive, Dropbox, Cloudinary, or any public CDN. Images should be under 2MB for fast loading.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && <Toast msg={toast.msg} type={toast.type} onClose={()=>setToast(null)} />}
+    </div>
+  );
+}
+
+// ── MAIN ADMIN PANEL ─────────────────────────────────────────
+export default function TenantAdminPanel() {
+  const [sel, setSel] = useState(null);
+  const [search, setSearch] = useState("");
+  const [statuses, setStatuses] = useState({});
+
+  // Load save status for all tenants
+  useEffect(() => {
+    Promise.all(
+      TENANTS.map(t => window.storage.get(STORAGE_KEY(t.id))
+        .then(r => [t.id, !!r])
+        .catch(() => [t.id, false])
+      )
+    ).then(results => {
+      const map = {};
+      results.forEach(([id,has]) => { map[id] = has; });
+      setStatuses(map);
+    });
+  }, [sel]);
+
+  const filtered = TENANTS.filter(t =>
+    !search || t.name.toLowerCase().includes(search.toLowerCase()) || t.cat.toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (sel) return (
+    <div style={{padding:"32px 40px",maxWidth:1100,margin:"0 auto"}}>
+      <style>{CSS + `@keyframes slideUp{from{transform:translateY(14px);opacity:0}to{transform:translateY(0);opacity:1}}`}</style>
+      <MicrositeEditor tenant={sel} onBack={()=>setSel(null)} />
+    </div>
+  );
+
+  return (
+    <div style={{padding:"32px 40px",maxWidth:1100,margin:"0 auto"}}>
+      <style>{CSS + `@keyframes slideUp{from{transform:translateY(14px);opacity:0}to{transform:translateY(0);opacity:1}}`}</style>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" />
+
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:32,borderBottom:`1px solid rgba(201,168,76,.15)`,paddingBottom:24}}>
+        <div>
+          <div style={{fontFamily:"Georgia,serif",fontSize:28,color:C.iv,marginBottom:4}}>
+            Villa <span style={{color:C.gd}}>Vista</span> — Tenant Admin
+          </div>
+          <div style={{fontSize:12,color:C.mu}}>Manage microsite content, offers, logos and social links for each tenant.</div>
+        </div>
+        <div style={{marginLeft:"auto"}}>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search tenants…"
+            style={{background:C.obL,border:`1px solid rgba(201,168,76,.15)`,color:C.iv,padding:"9px 14px",fontFamily:"inherit",fontSize:13,width:220,outline:"none"}} />
+        </div>
+      </div>
+
+      {/* Instructions */}
+      <div style={{padding:"14px 18px",background:C.obM,border:`1px solid rgba(201,168,76,.12)`,marginBottom:28,fontSize:13,color:C.mu,lineHeight:1.7}}>
+        <strong style={{color:C.iv}}>How to edit a tenant microsite:</strong> Click any tenant below → edit logo, brand colours, opening hours, about text, social media handles, and offers with images → click Save Changes. Changes are stored and appear live on the public website immediately.
+      </div>
+
+      {/* Tenant grid */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:13}}>
+        {filtered.map(t => (
+          <div key={t.id} onClick={()=>setSel(t)} style={{background:C.obL,border:`1px solid rgba(201,168,76,.12)`,padding:18,cursor:"pointer",transition:"all .2s"}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor=C.gd} onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(201,168,76,.12)"}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+              <span style={{fontSize:28}}>{t.e}</span>
+              <span style={{fontSize:9,letterSpacing:1.5,textTransform:"uppercase",padding:"3px 8px",
+                background: statuses[t.id] ? "rgba(46,204,113,.12)" : "rgba(201,168,76,.1)",
+                color: statuses[t.id] ? C.ok : C.mu,
+                border: `1px solid ${statuses[t.id] ? "rgba(46,204,113,.2)" : "rgba(201,168,76,.15)"}`}}>
+                {statuses[t.id] ? "Configured" : "Default"}
+              </span>
+            </div>
+            <div style={{fontSize:14,fontWeight:500,color:C.iv,marginBottom:3}}>{t.name}</div>
+            <div style={{fontSize:10,letterSpacing:1.5,textTransform:"uppercase",color:C.mu,marginBottom:12}}>{t.cat}</div>
+            <div style={{fontSize:11,color:C.gd,borderTop:`1px solid rgba(201,168,76,.08)`,paddingTop:10}}>
+              Edit microsite →
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
