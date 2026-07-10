@@ -1,3 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #0d0f14;
+  --color-foreground: #f5f0e8;
+  --color-card: #14171f;
+  --color-card-foreground: #f5f0e8;
+  --color-muted: #1a1e28;
+  --color-muted-foreground: #8b8578;
+  --color-border: #2a2e38;
+  --color-primary: #c9a84c;
+  --color-primary-foreground: #0d0f14;
+  --color-destructive: #e0684c;
+  --color-destructive-foreground: #f5f0e8;
+  --font-serif: Georgia, "Times New Roman", serif;
+}
+
 *,
 *::before,
 *::after {
