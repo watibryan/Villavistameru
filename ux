@@ -1,0 +1,984 @@
+import { useState, useEffect, useRef } from "react";
+
+// ─── PALETTE ────────────────────────────────────────────────
+const C = {
+  ob:"#0D0F14", obM:"#0D0F14", obL:"#131720",
+  gd:"#C9A84C", gdL:"#E8C96A", gdD:"#8A6E2F",
+  tc:"#B85C38", iv:"#F5F0E8", ivD:"#DDD5C4",
+  mu:"#6B7280", ok:"#2ECC71",
+};
+
+// ─── LOGO — SVG recreation of the VV gold emblem + wordmark ─
+// Faithfully recreated from the uploaded asset: circular VV mark + spaced caps
+const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 120" fill="#C9A84C">
+  <!-- VV shield/emblem mark -->
+  <ellipse cx="140" cy="32" rx="28" ry="30" fill="none" stroke="#C9A84C" stroke-width="5"/>
+  <path d="M124 12 L134 48 L140 36 L146 48 L156 12" fill="none" stroke="#C9A84C" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Left arc fill -->
+  <path d="M112 20 Q112 52 140 58 Q112 56 110 30 Z" fill="#C9A84C" opacity="0.9"/>
+  <!-- Right arc fill -->
+  <path d="M168 20 Q168 52 140 58 Q168 56 170 30 Z" fill="#C9A84C" opacity="0.9"/>
+  <!-- VV script strokes -->
+  <path d="M127 16 L136 46 L140 34 L144 46 L153 16" fill="none" stroke="#0D0F14" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- VILLA VISTA wordmark -->
+  <text x="140" y="92" font-family="Georgia,serif" font-size="18" font-weight="400" letter-spacing="8" text-anchor="middle" fill="#C9A84C">VILLA VISTA</text>
+  <text x="140" y="108" font-family="Georgia,serif" font-size="7" letter-spacing="4" text-anchor="middle" fill="#8A6E2F">MERU · KENYA</text>
+</svg>`;
+
+const LOGO_URI = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(LOGO_SVG)}`;
+
+// ─── DATA ───────────────────────────────────────────────────
+const TENANTS = [
+  {id:1,  name:"Tash Aqua Lounge",        shortName:"Tash Aqua",   cat:"Dining",       floor:"Ground",  st:"Operating",  owned:true,  e:"🍹", desc:"Poolside restaurant, bar and live music.",           offer:"15% off food, 10% off bar — members daily"},
+  {id:2,  name:"Chandarana FoodPlus",     shortName:"Chandarana",  cat:"Supermarket",  floor:"Ground",  st:"Coming Soon",anchor:true, e:"🛒", desc:"Meru's largest premium supermarket — 18,000 sq ft.",offer:"2× Vista Points on every grocery purchase"},
+  {id:3,  name:"KCB Bank",               shortName:"KCB",         cat:"Banking",      floor:"Ground",  st:"Operating",  e:"🏦", desc:"Full-service banking, forex, loans and advisory.",   offer:"Zero-fee account opening for Vista members"},
+  {id:4,  name:"Equity Bank",            shortName:"Equity",      cat:"Banking",      floor:"Ground",  st:"Operating",  e:"🏦", desc:"Personal banking, Equitel mobile money and investment.",offer:"Fast-track account opening with Vista ID"},
+  {id:5,  name:"Xiaomi",                 shortName:"Xiaomi",      cat:"Electronics",  floor:"Ground",  st:"Coming Soon",e:"📱", desc:"Official Xiaomi smartphones, smart home and accessories.",offer:"Free screen protector with every device"},
+  {id:6,  name:"Killimall",              shortName:"Killimall",   cat:"Electronics",  floor:"Ground",  st:"Coming Soon",e:"📦", desc:"Electronics and online marketplace pick-up hub.",    offer:"Same-day pick-up within Meru town"},
+  {id:7,  name:"Gamelo Enterprises",     shortName:"Gamelo",      cat:"Gaming",       floor:"Ground",  st:"Operating",  e:"🎮", desc:"Premium gaming — PS5, VR stations and esports.",    offer:"1 free hour for new Vista members"},
+  {id:8,  name:"Generations Electronics",shortName:"Generations", cat:"Electronics",  floor:"Ground",  st:"Operating",  e:"🖥", desc:"Consumer electronics, repairs and second-hand devices.",offer:"Trade in your device for instant credit"},
+  {id:9,  name:"Doctor Laundry",         shortName:"Dr. Laundry", cat:"Services",     floor:"Ground",  st:"Operating",  e:"👔", desc:"Professional dry cleaning and garment care.",        offer:"Express 4-hour turnaround service"},
+  {id:10, name:"Otawa Farms",            shortName:"Otawa",       cat:"Dining",       floor:"Ground",  st:"Coming Soon",e:"🥩", desc:"Farm-to-table meats and dairy from Mt. Kenya.",      offer:"Priority cuts on request for Vista members"},
+  {id:11, name:"River Ranch",            shortName:"River Ranch", cat:"Dining",       floor:"Ground",  st:"Operating",  e:"🔥", desc:"Open-air choma, live events and family dining.",     offer:"Groups of 10+ get complimentary kachumbari"},
+  {id:12, name:"Jajemelo",              shortName:"Jajemelo",    cat:"Dining",       floor:"First",   st:"Coming Soon",e:"🍔", desc:"Burgers, wraps, fresh juices and local favourites.", offer:"KEMU students: 20% off with ID"},
+  {id:13, name:"Trada Essence",          shortName:"Trada",       cat:"Retail",       floor:"First",   st:"Coming Soon",e:"🛍", desc:"Curated lifestyle and essentials boutique.",         offer:"First purchase discount for Vista members"},
+  {id:14, name:"Kainga Cutlery",         shortName:"Kainga",      cat:"Retail",       floor:"Ground",  st:"Coming Soon",e:"🍴", desc:"Premium cutlery, kitchenware and homeware.",         offer:"Earn Vista Points on every purchase"},
+  {id:15, name:"Ranch Butchers",         shortName:"Ranch",       cat:"Dining",       floor:"Ground",  st:"Coming Soon",e:"🥩", desc:"Fresh meats, marinated cuts and custom orders.",     offer:"Earn Vista Points on every purchase"},
+  {id:16, name:"Leichana Ayieko and Co", shortName:"Leichana",    cat:"Professional", floor:"Third",   st:"Coming Soon",e:"⚖️", desc:"Conveyancing, commercial law, litigation and notary.",offer:"Free 30-min consultation for Vista members"},
+  {id:17, name:"Car Wash",              shortName:"VV Car Wash", cat:"Services",     floor:"Ground",  st:"Coming Soon",e:"🚗", desc:"Premium car wash and detailing in the mall car yard.",offer:"Free valet wash with 3+ hour mall visit"},
+  {id:18, name:"Mormon Church",          shortName:"LDS Church",  cat:"Community",    floor:"Second",  st:"Operating",  e:"⛪", desc:"Sunday services and community events open to all.",  offer:"Community events open to everyone"},
+  {id:19, name:"Aura Spa and Wellness",  shortName:"Aura Spa",    cat:"Wellness",     floor:"Second",  st:"Operating",  aff:true,e:"✨",desc:"Massages, facials, body treatments and wellness.",offer:"Complimentary foot soak with every booking"},
+  {id:20, name:"KeMU Health Centre",     shortName:"KeMU Health", cat:"Healthcare",   floor:"Second",  st:"Operating",  aff:true,e:"🏥",desc:"GP, dental, pharmacy and occupational health.",  offer:"Free Saturday screening — Gold and Platinum"},
+  {id:21, name:"Night Club",             shortName:"VV Nightclub",cat:"Entertainment",floor:"Ground",  st:"Coming Soon",e:"🎵", desc:"Premium nightclub — live acts, DJs and exclusive events.",offer:"Platinum members: priority entry and VIP tables"},
+  {id:22, name:"Jajemelo Parking",       shortName:"Parking",     cat:"Services",     floor:"Basement",st:"Coming Soon",e:"🅿️",desc:"Monthly, daily and event parking.",                  offer:"2 hours free parking for Vista members"},
+];
+
+// ─── VACANT UNITS — available for lease ─────────────────────
+const VACANCIES = [
+  { id:"V1", unit:"AG-004", floor:"Ground", sqft:320,  type:"Retail",       rent:56550,  features:["Corner position","High footfall","Fitted shell"],   media:[], highlight:"Corner visibility opposite main entrance" },
+  { id:"V2", unit:"AG-007", floor:"Ground", sqft:180,  type:"F&B Kiosk",    rent:36000,  features:["Kiosk format","Power + water points","Inline flow"], media:[], highlight:"Ideal for coffee, juice bar or snacks" },
+  { id:"V3", unit:"AG-011", floor:"Ground", sqft:450,  type:"Retail",       rent:75000,  features:["Open plan","Ground floor","Natural light"],          media:[], highlight:"Largest available ground floor unit" },
+  { id:"V4", unit:"B-201",  floor:"Second", sqft:800,  type:"Office",       rent:120000, features:["Mountain view","Fitted washrooms","Private lobby"], media:[], highlight:"Premium second-floor office with Mt. Kenya views" },
+  { id:"V5", unit:"B-202",  floor:"Second", sqft:400,  type:"Office",       rent:64000,  features:["Partitioned","Kitchenette","Broadband ready"],       media:[], highlight:"Ready-to-occupy office suite" },
+  { id:"V6", unit:"C-301",  floor:"Third",  sqft:600,  type:"Professional", rent:91000,  features:["Column-free","Private entrance","Finishing allowance"],media:[],highlight:"Ideal for clinic, legal, or consultancy firm" },
+  { id:"V7", unit:"AG-018", floor:"Ground", sqft:240,  type:"Retail",       rent:42000,  features:["Shell and core","Frontage 8m","Active corridor"],    media:[], highlight:"Premium frontage on the main retail corridor" },
+];
+
+// ─── MICROSITE DEFAULTS ──────────────────────────────────────
+const MICROSITE_DEFAULTS = {
+  "1": {brand:{primary:"#0a1a0e",accent:"#4CAF82"},hours:"Mon–Thu 11am–11pm · Fri–Sat 10am–1am · Sun 10am–10pm",about:"Villa Vista's signature poolside dining destination — elevated local cuisine, crafted cocktails, and live music every Friday and Saturday.",social:{ig:"tashaqua_meru",fb:"TashAquaLounge"},offers:[{title:"Member Discount",desc:"15% off food, 10% off bar every day",img:null,tag:"Members Only"},{title:"Friday Jazz Night",desc:"Live jazz every Friday from 7pm",img:null,tag:"Weekly"},{title:"Sunday Brunch",desc:"3-course brunch buffet 10am–2pm",img:null,tag:"Weekly"}]},
+  "7": {brand:{primary:"#0a001a",accent:"#9B59B6"},hours:"Mon–Thu 10am–10pm · Fri–Sat 10am–midnight",about:"Meru's first premium gaming lounge — PS5, VR stations, PC rigs and regular esports tournaments.",social:{ig:"gamelokenya",tiktok:"gamelokenya"},offers:[{title:"1 Free Hour",desc:"New Vista members get first hour free",img:null,tag:"Members Only"},{title:"Weekend Tournament",desc:"Weekly esports tournaments every Saturday",img:null,tag:"Weekly"}]},
+  "11":{brand:{primary:"#1a0800",accent:"#D2691E"},hours:"Daily 11am–11pm",about:"Open-air choma zone — slow-grilled nyama choma, live entertainment and family dining.",social:{ig:"riverranchmeru",fb:"RiverRanchMeru"},offers:[{title:"Group Discount",desc:"Groups of 10+ get complimentary kachumbari platter",img:null,tag:"Always On"},{title:"Saturday Live",desc:"Live band every Saturday from 6pm",img:null,tag:"Weekly"}]},
+  "19":{brand:{primary:"#1a001a",accent:"#9B59B6"},hours:"Mon–Sat 9am–7pm · Sun 10am–5pm",about:"Sanctuary of relaxation — therapeutic massages, facials, body treatments, manicures and pedicures.",social:{ig:"auraspa_meru",fb:"AuraSpaMeru"},offers:[{title:"Welcome Foot Soak",desc:"Complimentary herbal foot soak with every booking",img:null,tag:"Always On"},{title:"Couple's Package",desc:"Book a couple's massage — 15% off total",img:null,tag:"Special"}]},
+};
+function defaultMs(t) {
+  return {brand:{primary:"#0D0F14",accent:C.gd},hours:t.st==="Operating"?"See in-store for hours":"Coming Soon",about:t.desc,social:{},offers:[{title:t.offer.split("—")[0].trim(),desc:t.offer,img:null,tag:"Members Only"}]};
+}
+
+const TIERS = [
+  {name:"Explorer",col:"#8B6914",txt:"#D4A843",min:0,    mult:1,  perks:["Digital card","Birthday 500pts","Member-only offers","Mall directory access"]},
+  {name:"Silver",  col:"#7A8499",txt:"#B0BDC9",min:5000, mult:1.5,perks:["1.5x points everywhere","Priority event booking","Free weekday parking","Monthly newsletter"]},
+  {name:"Gold",    col:"#C9A84C",txt:"#E8C96A",min:20000,mult:2,  perks:["2x points","Tash Aqua lounge access","2 guest passes/month","Dedicated concierge","Saturday health screening"]},
+  {name:"Platinum",col:"#9BB5D4",txt:"#C4D8EC",min:50000,mult:3,  perks:["3x points","Personal lifestyle manager","Private event invitations","Unlimited free parking","Annual Gala invitation"]},
+];
+
+const EVENTS = [
+  {id:1,title:"World Cup Fan Village",  date:"Jul–Aug 2026",cat:"Sports",   cap:2000,bkd:1240,free:false,e:"⚽",desc:"FIFA World Cup viewing — giant screens, food village, live DJ and sports bar."},
+  {id:2,title:"Meru Business Summit",   date:"Aug 9, 2026", cat:"Corporate",cap:300, bkd:187, free:false,e:"💼",desc:"Mt. Kenya regional business conference — keynotes, panels and networking dinner."},
+  {id:3,title:"Food Festival",          date:"Sep 12–14",   cat:"Lifestyle",cap:5000,bkd:2100,free:true, e:"🎉",desc:"Three days of cuisine, culture and community. 30+ vendors and live entertainment."},
+  {id:4,title:"Mt. Kenya Jazz Night",   date:"Jul 25, 2026",cat:"Music",    cap:500, bkd:380, free:false,e:"🎵",desc:"Live jazz under the stars at Tash Aqua. Premium dining with resident artists."},
+];
+
+const ROOMS = [
+  {id:1,name:"The Summit",    cap:120,sqft:2200,rate:"from KES 25,000",feat:["Stage","4K projector","PA system","Streaming","Catering"]},
+  {id:2,name:"Boardroom A",   cap:20, sqft:480, rate:"from KES 8,000", feat:["Video conf","85in 4K","Whiteboard","WiFi"]},
+  {id:3,name:"The Loft",      cap:50, sqft:900, rate:"from KES 14,000",feat:["Rooftop terrace","Bar setup","Sound system","Flexible"]},
+  {id:4,name:"Innovation Lab",cap:30, sqft:650, rate:"from KES 10,000",feat:["Smart TV","Breakout zones","Standing desks","Whiteboards"]},
+];
+
+const IG1="villavista_experienceit", IG2="villavistameru";
+const WA="https://wa.me/254700000000?text=Hi%20Villa%20Vista!";
+const IG_POSTS=[
+  {id:1,e:"🍹",tag:"tashaqua", cap:"Pool vibes only. Tash Aqua is Meru's favourite evening spot.",likes:342},
+  {id:2,e:"⚽",tag:"worldcup", cap:"World Cup Fan Village is LIVE. Grab your spot.",likes:891},
+  {id:3,e:"🌅",tag:"brunch",   cap:"Sunday brunch at the pool. Book your table.",likes:256},
+  {id:4,e:"✨",tag:"vista",    cap:"Meru's premier lifestyle destination is taking shape.",likes:578},
+  {id:5,e:"🎵",tag:"jazz",     cap:"Jazz Night Jul 25. Limited tables. Reserve yours.",likes:423},
+  {id:6,e:"🎮",tag:"gaming",   cap:"Gamelo Gaming — Meru's first premium gaming lounge.",likes:634},
+];
+
+// ─── HELPERS ────────────────────────────────────────────────
+const isOpen = t => t.st==="Operating" || t.owned || t.aff;
+const getTier = u => u ? TIERS.find(t=>t.name===u.tier)||TIERS[0] : null;
+const fmt = n => `KES ${n.toLocaleString()}`;
+
+// ─── ATOMS ──────────────────────────────────────────────────
+function Toast({msg,onClose}) {
+  useEffect(()=>{const t=setTimeout(onClose,4000);return()=>clearTimeout(t);},[]);
+  return <div style={{position:"fixed",bottom:84,right:20,zIndex:500,background:C.obL,border:`1px solid ${C.gd}`,padding:"12px 16px",display:"flex",gap:9,alignItems:"center",maxWidth:300,animation:"su .3s ease"}}><span style={{color:C.gd,flexShrink:0}}>✦</span><span style={{fontSize:12,color:C.iv,lineHeight:1.5}}>{msg}</span></div>;
+}
+function Overlay({onClose}) {
+  return <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",backdropFilter:"blur(8px)",zIndex:400}}/>;
+}
+function BtnG({children,onClick,full,sm,style={}}) {
+  return <button onClick={onClick} style={{background:C.gd,color:C.ob,border:"none",padding:sm?"8px 16px":"11px 24px",fontFamily:"inherit",fontSize:sm?10:11,fontWeight:600,letterSpacing:2,textTransform:"uppercase",cursor:"pointer",width:full?"100%":"auto",transition:"background .2s",...style}}
+    onMouseEnter={e=>e.currentTarget.style.background=C.gdL} onMouseLeave={e=>e.currentTarget.style.background=C.gd}>{children}</button>;
+}
+function BtnO({children,onClick,full,sm,style={}}) {
+  return <button onClick={onClick} style={{background:"transparent",color:C.gd,border:`1px solid ${C.gd}`,padding:sm?"8px 16px":"11px 24px",fontFamily:"inherit",fontSize:sm?10:11,fontWeight:600,letterSpacing:2,textTransform:"uppercase",cursor:"pointer",width:full?"100%":"auto",transition:"all .2s",...style}}
+    onMouseEnter={e=>{e.currentTarget.style.background=C.gd;e.currentTarget.style.color=C.ob;}} onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=C.gd;}}>{children}</button>;
+}
+function Inp({label,...p}) {
+  return <div><label style={{fontSize:9,letterSpacing:2,textTransform:"uppercase",color:C.mu,display:"block",marginBottom:5}}>{label}</label>
+    <input {...p} style={{background:C.obL,border:`1px solid rgba(201,168,76,.2)`,color:C.iv,padding:"10px 13px",fontFamily:"inherit",fontSize:13,width:"100%",outline:"none",transition:"border-color .2s",...(p.style||{})}} onFocus={e=>e.target.style.borderColor=C.gd} onBlur={e=>e.target.style.borderColor="rgba(201,168,76,.2)"}/></div>;
+}
+function Sel({label,options}) {
+  return <div><label style={{fontSize:9,letterSpacing:2,textTransform:"uppercase",color:C.mu,display:"block",marginBottom:5}}>{label}</label>
+    <select style={{background:C.obL,border:`1px solid rgba(201,168,76,.2)`,color:C.iv,padding:"10px 13px",fontFamily:"inherit",fontSize:13,width:"100%",outline:"none",appearance:"none",cursor:"pointer"}}>
+      {options.map(o=><option key={o}>{o}</option>)}</select></div>;
+}
+function Badge({t}) {
+  if(t.owned) return <span style={bs("#9BB5D4","rgba(155,181,212,.12)")}>Villa Vista</span>;
+  if(t.anchor) return <span style={bs(C.gdL,"rgba(201,168,76,.15)")}>Anchor Tenant</span>;
+  if(isOpen(t)) return <span style={bs(C.ok,"rgba(46,204,113,.12)")}>Open</span>;
+  return <span style={bs(C.tc,"rgba(184,92,56,.12)")}>Coming Soon</span>;
+}
+const bs=(col,bg)=>({fontSize:9,letterSpacing:1.5,textTransform:"uppercase",color:col,background:bg,border:`1px solid ${col}40`,padding:"2px 8px"});
+
+// ─── TRANSACTION WINDOW SHELL ────────────────────────────────
+// The core reusable modal used for ALL interactions:
+// tenant microsites, loyalty signup, vacancies, events, rooms, auth
+function TxWindow({accent=C.gd,bg=C.ob,icon,title,sub,badge,onClose,children,wide}) {
+  return <>
+    <Overlay onClose={onClose}/>
+    <div style={{position:"fixed",inset:0,zIndex:401,display:"flex",alignItems:"center",justifyContent:"center",padding:16,overflowY:"auto"}}>
+      <div style={{background:C.ob,border:`1px solid ${accent}40`,maxWidth:wide?740:640,width:"100%",maxHeight:"92vh",overflowY:"auto",display:"flex",flexDirection:"column",position:"relative"}}>
+        {/* Branded header */}
+        <div style={{background:bg,borderBottom:`2px solid ${accent}`,padding:"18px 24px",display:"flex",alignItems:"center",gap:14,position:"sticky",top:0,zIndex:10,flexShrink:0}}>
+          {icon&&<div style={{width:46,height:46,background:`${accent}18`,border:`1px solid ${accent}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,borderRadius:4,flexShrink:0}}>{icon}</div>}
+          <div style={{flex:1,minWidth:0}}>
+            <h3 style={{fontFamily:"Georgia,serif",fontSize:19,fontWeight:300,color:C.iv,marginBottom:badge?3:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{title}</h3>
+            {badge&&<div style={{display:"flex",gap:7,alignItems:"center",flexWrap:"wrap"}}>{badge}</div>}
+            {sub&&!badge&&<p style={{fontSize:11,color:C.mu,marginTop:2}}>{sub}</p>}
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",color:C.mu,fontSize:20,cursor:"pointer",flexShrink:0,lineHeight:1}}>✕</button>
+        </div>
+        <div style={{flex:1}}>{children}</div>
+      </div>
+    </div>
+  </>;
+}
+
+// Tab bar used inside TxWindow
+function TxTabs({tabs,active,onChange,accent=C.gd}) {
+  return <div style={{display:"flex",borderBottom:`1px solid rgba(201,168,76,.12)`,padding:"0 24px",flexShrink:0}}>
+    {tabs.map(tb=><button key={tb.id} onClick={()=>onChange(tb.id)} style={{fontSize:10,letterSpacing:1.5,textTransform:"uppercase",padding:"11px 14px",background:"none",border:"none",borderBottom:active===tb.id?`2px solid ${accent}`:"2px solid transparent",color:active===tb.id?accent:C.mu,cursor:"pointer",whiteSpace:"nowrap"}}>{tb.label}</button>)}
+  </div>;
+}
+
+// ─── TENANT MICROSITE ────────────────────────────────────────
+function TenantModal({t,onClose,onEnquire,onNotify,user}) {
+  const [tab,setTab]=useState("about");
+  const [ms,setMs]=useState(null);
+  const open=isOpen(t);
+  const tier=getTier(user);
+  useEffect(()=>{
+    const def=MICROSITE_DEFAULTS[String(t.id)]||defaultMs(t);
+    if(window.storage){window.storage.get(`ms-${t.id}`).then(r=>setMs(r?JSON.parse(r.value):def)).catch(()=>setMs(def));}
+    else setMs(def);
+  },[t.id]);
+  if(!ms) return null;
+  const acc=ms.brand?.accent||C.gd;
+  const bg=ms.brand?.primary||C.ob;
+  const socials=Object.entries(ms.social||{}).filter(([,v])=>v).map(([k,v])=>{
+    const urls={ig:`https://instagram.com/${v}`,fb:`https://facebook.com/${v}`,tw:`https://twitter.com/${v}`,tiktok:`https://tiktok.com/@${v}`,website:v};
+    const icons={ig:"📸",fb:"👍",tw:"🐦",tiktok:"🎵",website:"🌐"};
+    return {href:urls[k]||"#",icon:icons[k]||"🔗",label:k};
+  });
+  const tabs=[{id:"about",label:"About"},{id:"offers",label:"Offers"},{id:open?"enquire":"notify",label:open?"Book / Enquire":"Get Notified"}];
+  return <TxWindow accent={acc} bg={bg} icon={t.e} title={t.name} badge={<><Badge t={t}/><span style={{fontSize:10,letterSpacing:1.5,textTransform:"uppercase",color:C.mu}}>{t.cat} · {t.floor}</span></>} onClose={onClose}>
+    {ms.hours&&ms.hours!=="Coming Soon"&&<div style={{background:`${acc}10`,borderBottom:`1px solid ${acc}20`,padding:"6px 24px",fontSize:12,color:C.ivD,flexShrink:0}}>🕐 {ms.hours}</div>}
+    <TxTabs tabs={tabs} active={tab} onChange={setTab} accent={acc}/>
+    <div style={{padding:"20px 24px"}}>
+      {tab==="about"&&<div>
+        <p style={{fontSize:14,color:C.ivD,lineHeight:1.9,marginBottom:16}}>{ms.about||t.desc}</p>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
+          {[["Floor",t.floor],["Hours",ms.hours||"—"],["Category",t.cat],["Status",t.st]].map(([k,v])=>(
+            <div key={k} style={{padding:"9px 12px",background:C.obL}}><div style={{fontSize:9,letterSpacing:2,textTransform:"uppercase",color:C.mu,marginBottom:2}}>{k}</div><div style={{fontSize:13,color:C.iv}}>{v}</div></div>
+          ))}
+        </div>
+        {socials.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {socials.map(({href,icon,label})=>(
+            <a key={label} href={href} target="_blank" rel="noreferrer" style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:C.mu,textDecoration:"none",padding:"4px 9px",background:C.obL,border:`1px solid rgba(201,168,76,.1)`,transition:"all .2s"}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=acc;e.currentTarget.style.color=acc;}} onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(201,168,76,.1)";e.currentTarget.style.color=C.mu;}}>{icon} <span style={{letterSpacing:1,textTransform:"uppercase"}}>{label}</span></a>
+          ))}
+        </div>}
+      </div>}
+      {tab==="offers"&&<div>
+        {user&&tier&&<div style={{padding:"8px 12px",background:C.obL,borderLeft:`2px solid ${tier.col}`,fontSize:12,color:C.mu,marginBottom:14}}>You earn <strong style={{color:C.gd}}>{tier.mult}x Vista Points</strong> here as a <span style={{color:tier.txt}}>{user.tier}</span> member.</div>}
+        {!user&&<p style={{fontSize:12,color:C.mu,marginBottom:14}}>Sign in to activate your membership benefits here.</p>}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          {(ms.offers||[]).map((o,i)=>(
+            <div key={i} style={{background:C.obL,border:`1px solid rgba(201,168,76,.1)`,overflow:"hidden"}}>
+              {o.img?<img src={o.img} alt={o.title} style={{width:"100%",height:110,objectFit:"cover",display:"block"}} onError={e=>e.target.style.display="none"}/>
+              :<div style={{height:70,background:`linear-gradient(135deg,${C.obL},${C.ob})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26}}>🎁</div>}
+              <div style={{padding:"10px 12px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",gap:6,marginBottom:4,alignItems:"flex-start"}}>
+                  <span style={{fontSize:13,fontWeight:500,color:C.iv,flex:1}}>{o.title}</span>
+                  <span style={{fontSize:9,letterSpacing:1.5,textTransform:"uppercase",color:acc,background:`${acc}18`,border:`1px solid ${acc}35`,padding:"2px 6px",whiteSpace:"nowrap"}}>{o.tag}</span>
+                </div>
+                <p style={{fontSize:12,color:C.mu,lineHeight:1.6}}>{o.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>}
+      {tab==="enquire"&&<div style={{display:"grid",gap:11}}>
+        <p style={{fontSize:12,color:C.mu}}>We confirm via WhatsApp within 2 hours.</p>
+        <Inp label="Your Name" placeholder="Full name" defaultValue={user?.name}/>
+        <Inp label="Phone / WhatsApp" placeholder="+254 7XX XXX XXX" defaultValue={user?.phone}/>
+        <Inp label="Date (if applicable)" type="date"/>
+        <Inp label="Message" placeholder="What would you like to book or ask?"/>
+        <BtnG onClick={()=>{onEnquire(t);onClose();}} full>Send Enquiry to {t.shortName||t.name}</BtnG>
+      </div>}
+      {tab==="notify"&&<div style={{display:"grid",gap:11}}>
+        <div style={{textAlign:"center",padding:"10px 0 16px"}}>
+          <div style={{fontSize:34,marginBottom:9}}>{t.e}</div>
+          <h4 style={{fontFamily:"Georgia,serif",fontSize:17,fontWeight:300,color:C.iv,marginBottom:6}}>{t.name} — Coming Soon</h4>
+          <p style={{fontSize:12,color:C.mu}}>{t.st} — we will notify you when they open.</p>
+        </div>
+        <Inp label="Your Email" type="email" placeholder="you@example.com"/>
+        <Inp label="Your Phone (optional)" placeholder="+254 7XX XXX XXX"/>
+        <BtnG onClick={()=>{onNotify(t);onClose();}} full>Notify Me When {t.shortName||t.name} Opens</BtnG>
+      </div>}
+    </div>
+  </TxWindow>;
+}
+
+// ─── VACANCY TRANSACTION WINDOW ─────────────────────────────
+function VacancyModal({unit,onClose,onEOI}) {
+  const [tab,setTab]=useState("space");
+  const [step,setStep]=useState(1); // EOI multi-step
+  const [form,setForm]=useState({name:"",company:"",email:"",phone:"",biz:"",sqft:"",timeline:"",notes:""});
+  const set=k=>e=>setForm(f=>({...f,[k]:e.target.value}));
+  const tabs=[{id:"space",label:"The Space"},{id:"specs",label:"Specs"},{id:"eoi",label:"Express Interest"}];
+  const typeColor={Retail:C.gd,Office:"#4CAF82","F&B Kiosk":C.tc,Professional:"#9BB5D4"}[unit.type]||C.gd;
+
+  return <TxWindow accent={typeColor} bg="#0D1018" icon="🏢" title={`Unit ${unit.unit}`}
+    badge={<><span style={bs(typeColor,`${typeColor}18`)}>{unit.type}</span><span style={{fontSize:10,letterSpacing:1.5,textTransform:"uppercase",color:C.mu}}>{unit.floor} Floor · {unit.sqft} sq ft</span></>}
+    onClose={onClose} wide>
+    <TxTabs tabs={tabs} active={tab} onChange={t=>{setTab(t);setStep(1);}} accent={typeColor}/>
+    <div style={{padding:"20px 24px"}}>
+
+      {tab==="space"&&<div>
+        {/* Highlight */}
+        <div style={{padding:"14px 18px",background:`${typeColor}14`,border:`1px solid ${typeColor}30`,marginBottom:18}}>
+          <p style={{fontSize:14,color:C.iv,lineHeight:1.8}}>✦ {unit.highlight}</p>
+        </div>
+        {/* Media placeholder — shows when images/video are loaded */}
+        <div style={{width:"100%",aspectRatio:"16/9",background:C.obL,border:`1px solid rgba(201,168,76,.1)`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",marginBottom:18,position:"relative",overflow:"hidden"}}>
+          {unit.media.length===0?(
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:40,marginBottom:10}}>🏗</div>
+              <div style={{fontSize:13,color:C.mu,marginBottom:4}}>Unit photos and video walk-through</div>
+              <div style={{fontSize:11,color:C.gdD}}>Media will appear here once uploaded via the Admin Panel</div>
+            </div>
+          ):(
+            <img src={unit.media[0]} alt={unit.unit} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+          )}
+          {/* Overlay badge */}
+          <div style={{position:"absolute",top:12,left:12,background:C.ob+"cc",padding:"4px 10px",fontSize:10,color:typeColor,letterSpacing:1.5,textTransform:"uppercase"}}>Available Now</div>
+        </div>
+        {/* Features */}
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:18}}>
+          {unit.features.map(f=><span key={f} style={{fontSize:11,background:C.obL,color:C.mu,padding:"5px 12px",border:`1px solid rgba(201,168,76,.1)`}}>{f}</span>)}
+        </div>
+        {/* Rent */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 18px",background:C.obL,border:`1px solid ${typeColor}30`,marginBottom:18}}>
+          <div>
+            <div style={{fontSize:9,letterSpacing:2,textTransform:"uppercase",color:C.mu,marginBottom:3}}>Monthly Rent</div>
+            <div style={{fontFamily:"monospace",fontSize:24,color:typeColor}}>{fmt(unit.rent)}</div>
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div style={{fontSize:9,letterSpacing:2,textTransform:"uppercase",color:C.mu,marginBottom:3}}>Area</div>
+            <div style={{fontFamily:"monospace",fontSize:18,color:C.iv}}>{unit.sqft} sq ft</div>
+          </div>
+        </div>
+        <BtnG onClick={()=>setTab("eoi")} full>Express Interest in This Unit →</BtnG>
+        <p style={{fontSize:11,color:C.mu,textAlign:"center",marginTop:8}}>No commitment. Our leasing team will follow up within 24 hours.</p>
+      </div>}
+
+      {tab==="specs"&&<div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:16}}>
+          {[["Unit Reference",unit.unit],["Floor",unit.floor],["Area",`${unit.sqft} sq ft`],["Type",unit.type],["Monthly Rent",fmt(unit.rent)],["Fit-out",unit.features[0]||"Shell and core"],["Handover","Immediate"],["Lease Term","Minimum 1 year"]].map(([k,v])=>(
+            <div key={k} style={{padding:"10px 13px",background:C.obL}}>
+              <div style={{fontSize:9,letterSpacing:2,textTransform:"uppercase",color:C.mu,marginBottom:2}}>{k}</div>
+              <div style={{fontSize:13,color:C.iv}}>{v}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{padding:"14px 18px",background:C.obL,border:`1px solid rgba(201,168,76,.1)`,marginBottom:16}}>
+          <div style={{fontSize:9,letterSpacing:2,textTransform:"uppercase",color:C.gd,marginBottom:8}}>What's Included</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+            {["Mall marketing and footfall","Vista loyalty programme access","Property management","Security 24/7","Common area maintenance","Mall insurance cover"].map(f=>(
+              <div key={f} style={{display:"flex",gap:7,alignItems:"flex-start",fontSize:12,color:C.mu}}>
+                <span style={{color:C.gd,flexShrink:0}}>✦</span>{f}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{display:"flex",gap:9}}>
+          <BtnG onClick={()=>setTab("eoi")} full>Express Interest →</BtnG>
+          <BtnO onClick={()=>window.open(WA,"_blank")} sm>WhatsApp Us</BtnO>
+        </div>
+      </div>}
+
+      {tab==="eoi"&&<div>
+        {step===1&&<div>
+          <div style={{marginBottom:20,padding:"12px 16px",background:`${typeColor}12`,borderLeft:`3px solid ${typeColor}`}}>
+            <div style={{fontSize:11,color:typeColor,letterSpacing:1.5,textTransform:"uppercase",marginBottom:3}}>Step 1 of 3 — Your Details</div>
+            <div style={{fontSize:12,color:C.mu}}>Express your interest in Unit {unit.unit}. No commitment — our leasing team will respond within 24 hours.</div>
+          </div>
+          <div style={{display:"grid",gap:12}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <Inp label="Full Name" placeholder="Your name" value={form.name} onChange={set("name")}/>
+              <Inp label="Company / Business Name" placeholder="Your business" value={form.company} onChange={set("company")}/>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <Inp label="Email Address" type="email" placeholder="you@company.com" value={form.email} onChange={set("email")}/>
+              <Inp label="Phone / WhatsApp" placeholder="+254 7XX XXX XXX" value={form.phone} onChange={set("phone")}/>
+            </div>
+            <BtnG onClick={()=>setStep(2)} full disabled={!form.name||!form.email}>Continue →</BtnG>
+          </div>
+        </div>}
+        {step===2&&<div>
+          <div style={{marginBottom:20,padding:"12px 16px",background:`${typeColor}12`,borderLeft:`3px solid ${typeColor}`}}>
+            <div style={{fontSize:11,color:typeColor,letterSpacing:1.5,textTransform:"uppercase",marginBottom:3}}>Step 2 of 3 — Your Business</div>
+            <div style={{fontSize:12,color:C.mu}}>Tell us about your business so we can prepare the right package for you.</div>
+          </div>
+          <div style={{display:"grid",gap:12}}>
+            <Inp label="Nature of Business / Concept" placeholder="e.g. Fashion retail, Coffee shop, Law firm…" value={form.biz} onChange={set("biz")}/>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <Sel label="Space Required" options={["Under 200 sq ft","200–400 sq ft","400–800 sq ft","800–1,500 sq ft","1,500 sq ft and above"]}/>
+              <Sel label="Target Move-In Timeline" options={["Immediately","Within 1 month","1–3 months","3–6 months","6+ months"]}/>
+            </div>
+            <div>
+              <label style={{fontSize:9,letterSpacing:2,textTransform:"uppercase",color:C.mu,display:"block",marginBottom:5}}>Additional Notes</label>
+              <textarea value={form.notes} onChange={set("notes")} placeholder="Any specific requirements, questions or context about your business…" style={{background:C.obL,border:`1px solid rgba(201,168,76,.2)`,color:C.iv,padding:"10px 13px",fontFamily:"inherit",fontSize:13,width:"100%",outline:"none",resize:"vertical",minHeight:80}}/>
+            </div>
+            <div style={{display:"flex",gap:9}}>
+              <BtnO onClick={()=>setStep(1)} sm>← Back</BtnO>
+              <BtnG onClick={()=>setStep(3)} full>Continue →</BtnG>
+            </div>
+          </div>
+        </div>}
+        {step===3&&<div>
+          <div style={{marginBottom:20,padding:"12px 16px",background:`${typeColor}12`,borderLeft:`3px solid ${typeColor}`}}>
+            <div style={{fontSize:11,color:typeColor,letterSpacing:1.5,textTransform:"uppercase",marginBottom:3}}>Step 3 of 3 — Review and Submit</div>
+          </div>
+          <div style={{display:"grid",gap:8,marginBottom:20}}>
+            {[["Unit",`${unit.unit} — ${unit.floor} Floor, ${unit.sqft} sq ft`],["Name",form.name],["Company",form.company||"—"],["Email",form.email],["Phone",form.phone],["Business",form.biz||"—"]].map(([k,v])=>(
+              <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"9px 13px",background:C.obL}}>
+                <span style={{fontSize:11,color:C.mu,letterSpacing:1,textTransform:"uppercase"}}>{k}</span>
+                <span style={{fontSize:13,color:C.iv,textAlign:"right",maxWidth:"60%"}}>{v}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"flex",gap:9}}>
+            <BtnO onClick={()=>setStep(2)} sm>← Back</BtnO>
+            <BtnG onClick={()=>{onEOI(unit,form);onClose();}} full>Submit Expression of Interest</BtnG>
+          </div>
+          <p style={{fontSize:11,color:C.mu,textAlign:"center",marginTop:8}}>Your EOI will be reviewed by our leasing team within 24 hours.</p>
+        </div>}
+        {/* Step progress dots */}
+        <div style={{display:"flex",justifyContent:"center",gap:8,marginTop:20}}>
+          {[1,2,3].map(s=><div key={s} style={{width:8,height:8,borderRadius:"50%",background:s<=step?typeColor:C.obL,border:`1px solid ${s<=step?typeColor:"rgba(201,168,76,.2)"}`}}/>)}
+        </div>
+      </div>}
+    </div>
+  </TxWindow>;
+}
+
+// ─── LOYALTY TRANSACTION WINDOW ──────────────────────────────
+function LoyaltyModal({user,onJoin,onClose,onShowDash}) {
+  const [tab,setTab]=useState(user?"your-status":"how-it-works");
+  const tier=getTier(user);
+  const tabs=[
+    {id:"how-it-works",label:"How It Works"},
+    {id:"tiers",label:"Tiers and Perks"},
+    ...(user?[{id:"your-status",label:"Your Status"},{id:"redeem",label:"Redeem Points"}]:[{id:"join",label:"Join Free"}]),
+  ];
+  const rewards=[{title:"Tash Aqua Dinner for Two",pts:5000,desc:"Full poolside dining"},{title:"Aura Spa 60 min",pts:3500,desc:"Signature treatment"},{title:"Any Vista Event",pts:2000,desc:"One ticketed event"},{title:"Mall Voucher KES 500",pts:1000,desc:"Any tenant"},{title:"Free Car Wash",pts:800,desc:"Full exterior wash"}];
+
+  return <TxWindow accent={C.gd} bg="#0D1020" icon="✦" title="Vista Rewards" sub="Modelled on frequent flyer miles" onClose={onClose} wide>
+    <TxTabs tabs={tabs} active={tab} onChange={setTab} accent={C.gd}/>
+    <div style={{padding:"20px 24px"}}>
+
+      {tab==="how-it-works"&&<div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
+          {[{e:"🛒",t:"Earn at every tenant",d:"KES 10 spent = 1 Vista Point, across all participating shops and restaurants."},
+            {e:"🎪",t:"Earn at every event",d:"Each event booking earns 100 base points, multiplied by your tier."},
+            {e:"📈",t:"Tier multipliers",d:"The higher your tier, the faster you earn. Platinum earns 3× on everything."},
+            {e:"🎁",t:"Redeem for experiences",d:"1,000 points = KES 100 in value. Redeem for dining, spa, events, and more."}
+          ].map(({e,t,d})=>(
+            <div key={t} style={{padding:"16px",background:C.obL,border:`1px solid rgba(201,168,76,.1)`}}>
+              <div style={{fontSize:26,marginBottom:8}}>{e}</div>
+              <div style={{fontSize:13,fontWeight:500,color:C.iv,marginBottom:5}}>{t}</div>
+              <p style={{fontSize:12,color:C.mu,lineHeight:1.65}}>{d}</p>
+            </div>
+          ))}
+        </div>
+        <div style={{padding:"12px 16px",background:C.obL,border:`1px solid rgba(201,168,76,.1)`,fontSize:12,color:C.mu,lineHeight:1.7}}>
+          <strong style={{color:C.iv}}>Points expiry:</strong> Points are valid for 12 months from the date they are earned. Activity resets the clock.
+        </div>
+        {!user&&<div style={{marginTop:16}}><BtnG onClick={()=>setTab("join")} full>Join Free — Earn 500 Welcome Points →</BtnG></div>}
+      </div>}
+
+      {tab==="tiers"&&<div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          {TIERS.map(tr=>(
+            <div key={tr.name} style={{padding:"18px 16px",background:C.obL,border:`1px solid ${tr.col}`,position:"relative"}}>
+              <div style={{fontFamily:"monospace",fontSize:9,letterSpacing:2,color:tr.txt,textTransform:"uppercase",background:`${tr.col}20`,padding:"2px 9px",display:"inline-block",marginBottom:10}}>{tr.name}</div>
+              <div style={{fontFamily:"monospace",fontSize:12,color:tr.txt,marginBottom:6}}>{tr.mult}× Points</div>
+              <div style={{fontSize:10,color:C.mu,marginBottom:8}}>{tr.min===0?"Start free — join now":`${tr.min.toLocaleString()}+ points required`}</div>
+              <div style={{height:1,background:`${tr.col}30`,marginBottom:8}}/>
+              {tr.perks.map(p=><div key={p} style={{fontSize:11,color:C.mu,marginTop:4,display:"flex",gap:6}}><span style={{color:tr.txt,flexShrink:0}}>✦</span>{p}</div>)}
+              {user&&tier?.name===tr.name&&<div style={{position:"absolute",top:10,right:10,fontSize:9,letterSpacing:1.5,textTransform:"uppercase",color:tr.txt,background:`${tr.col}30`,padding:"2px 6px"}}>Your Tier</div>}
+            </div>
+          ))}
+        </div>
+      </div>}
+
+      {tab==="your-status"&&user&&tier&&(()=>{
+        const next=TIERS[TIERS.indexOf(tier)+1]||null;
+        const pct=next?Math.min((user.points/next.min)*100,100):100;
+        return <div>
+          <div style={{padding:"20px 24px",background:C.obL,border:`1px solid ${tier.col}40`,marginBottom:16}}>
+            <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:14}}>
+              <div style={{width:52,height:52,background:`${tier.col}22`,border:`1px solid ${tier.col}`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"monospace",fontSize:20,color:tier.txt,borderRadius:2}}>
+                {(user.name||"?").charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <div style={{fontSize:15,color:C.iv,fontWeight:500}}>{user.name}</div>
+                <div style={{fontFamily:"monospace",fontSize:9,color:tier.txt,letterSpacing:2.5,textTransform:"uppercase"}}>{tier.name} Member</div>
+              </div>
+              <div style={{marginLeft:"auto",textAlign:"right"}}>
+                <div style={{fontFamily:"monospace",fontSize:32,color:tier.txt,lineHeight:1}}>{user.points.toLocaleString()}</div>
+                <div style={{fontSize:10,color:C.mu}}>Vista Points</div>
+              </div>
+            </div>
+            {next&&<><div style={{background:C.ob,height:3,borderRadius:2,marginBottom:6}}><div style={{background:tier.col,height:3,borderRadius:2,width:`${pct}%`,transition:"width .6s"}}/></div>
+              <div style={{fontSize:11,color:C.mu}}>{(next.min-user.points).toLocaleString()} points to {next.name}</div></>}
+            {!next&&<div style={{fontSize:11,color:tier.txt}}>✦ Maximum tier achieved — Platinum</div>}
+          </div>
+          <div style={{marginBottom:12,fontSize:10,letterSpacing:2,textTransform:"uppercase",color:C.gd}}>{tier.name} Benefits</div>
+          <div style={{display:"grid",gap:6,marginBottom:16}}>
+            {tier.perks.map(p=><div key={p} style={{display:"flex",gap:9,fontSize:13,color:C.ivD,padding:"7px 0",borderBottom:`1px solid rgba(201,168,76,.05)`}}><span style={{color:tier.txt,flexShrink:0}}>✦</span>{p}</div>)}
+          </div>
+          <BtnO onClick={()=>setTab("redeem")} full>Redeem My Points →</BtnO>
+        </div>;
+      })()}
+
+      {tab==="redeem"&&user&&<div>
+        <p style={{fontSize:12,color:C.mu,marginBottom:16}}>Redeem your <strong style={{color:C.gd}}>{user.points.toLocaleString()} points</strong> for exclusive experiences across Villa Vista.</p>
+        <div style={{display:"grid",gap:8}}>
+          {rewards.map(r=>(
+            <div key={r.title} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"13px 16px",background:C.obL,border:`1px solid rgba(201,168,76,.1)`}}>
+              <div><div style={{fontSize:13,color:C.iv,marginBottom:2}}>{r.title}</div><div style={{fontSize:11,color:C.mu}}>{r.desc}</div></div>
+              <BtnO sm style={{opacity:user.points>=r.pts?1:.4}}>{r.pts.toLocaleString()} pts</BtnO>
+            </div>
+          ))}
+        </div>
+      </div>}
+
+      {tab==="join"&&!user&&<div>
+        <div style={{textAlign:"center",padding:"10px 0 20px"}}>
+          <img src={LOGO_URI} alt="Villa Vista" style={{height:60,marginBottom:14,filter:"none"}}/>
+          <p style={{fontSize:13,color:C.mu,lineHeight:1.8,maxWidth:360,margin:"0 auto"}}>Join Vista Rewards for free. Earn 500 welcome points instantly. Every purchase, every visit, every event earns you more.</p>
+        </div>
+        <div style={{display:"grid",gap:11}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <Inp label="Full Name" placeholder="Your name"/>
+            <Inp label="Phone Number" placeholder="+254 7XX XXX XXX"/>
+          </div>
+          <Inp label="Email Address" type="email" placeholder="you@example.com"/>
+          <Inp label="Password" type="password" placeholder="Create a password"/>
+          <BtnG onClick={()=>{onJoin();onClose();}} full>Create Account — Earn 500 Welcome Points</BtnG>
+          <p style={{fontSize:11,color:C.mu,textAlign:"center"}}>Already a member? <span style={{color:C.gd,cursor:"pointer"}} onClick={onClose}>Sign in above</span></p>
+        </div>
+      </div>}
+    </div>
+  </TxWindow>;
+}
+
+// ─── AUTH MODAL ──────────────────────────────────────────────
+function AuthModal({mode,onClose,onAuth}) {
+  const [v,setV]=useState(mode);
+  const [n,setN]=useState(""); const [e,setE]=useState(""); const [ph,setPh]=useState("");
+  const submit=()=>{
+    onAuth(v==="register"?{name:n||"Guest Member",email:e,phone:ph,points:500,tier:"Explorer",joined:new Date().toLocaleDateString("en-KE")}:{name:"Wati Katenya",email:e,phone:"+254 700 000 000",points:24750,tier:"Gold",joined:"Jan 2025"});
+    onClose();
+  };
+  return <TxWindow accent={C.gd} bg="#0D1020" icon={<img src={LOGO_URI} alt="VV" style={{height:34,display:"block"}}/>} title={v==="register"?"Join Vista Rewards":"Welcome Back"} sub={v==="register"?"Free to join. Earn points from your first visit.":"Sign in to your account."} onClose={onClose}>
+    <div style={{padding:"20px 24px",display:"grid",gap:12}}>
+      {v==="register"&&<Inp label="Full Name" placeholder="Your name" value={n} onChange={x=>setN(x.target.value)}/>}
+      <Inp label="Email Address" type="email" placeholder="you@example.com" value={e} onChange={x=>setE(x.target.value)}/>
+      {v==="register"&&<Inp label="Phone Number" placeholder="+254 7XX XXX XXX" value={ph} onChange={x=>setPh(x.target.value)}/>}
+      <Inp label="Password" type="password" placeholder="password"/>
+      <BtnG onClick={submit} full>{v==="register"?"Create Account — Earn 500 Welcome Points":"Sign In"}</BtnG>
+      <p style={{fontSize:12,color:C.mu,textAlign:"center"}}>{v==="register"?"Already a member? ":"New to Vista? "}<span style={{color:C.gd,cursor:"pointer"}} onClick={()=>setV(v==="register"?"login":"register")}>{v==="register"?"Sign in":"Join free"}</span></p>
+    </div>
+  </TxWindow>;
+}
+
+// ─── EVENT MODAL ─────────────────────────────────────────────
+function EventModal({ev,onClose,onEnquire,user}) {
+  const tier=getTier(user);
+  return <TxWindow accent={C.tc} bg="#1a0800" icon={ev.e} title={ev.title} sub={`${ev.date} · ${ev.cat}`} onClose={onClose}>
+    <div style={{padding:"20px 24px"}}>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
+        {ev.free&&<span style={{fontSize:10,color:C.ok,background:"rgba(46,204,113,.1)",padding:"2px 7px",letterSpacing:1.5,textTransform:"uppercase"}}>Free Entry</span>}
+        <span style={{fontSize:10,color:C.mu,letterSpacing:1.5,textTransform:"uppercase"}}>{ev.cap-ev.bkd} spots remaining</span>
+      </div>
+      <p style={{fontSize:13,color:C.ivD,lineHeight:1.8,marginBottom:14}}>{ev.desc}</p>
+      <div style={{background:C.obL,height:3,borderRadius:2,marginBottom:4}}><div style={{background:C.tc,height:3,borderRadius:2,width:`${(ev.bkd/ev.cap)*100}%`}}/></div>
+      <div style={{fontSize:11,color:C.mu,marginBottom:18}}>{ev.bkd} of {ev.cap} reserved</div>
+      <div style={{display:"grid",gap:11}}>
+        <Inp label="Your Name" placeholder="Full name" defaultValue={user?.name}/>
+        <Inp label="Phone / WhatsApp" placeholder="+254 7XX XXX XXX" defaultValue={user?.phone}/>
+        <Inp label="Number of Tickets" type="number" placeholder="2"/>
+        <div style={{padding:"11px 14px",background:C.obL,fontSize:12,color:C.ivD,lineHeight:1.7}}>
+          <strong style={{color:C.iv}}>Payment:</strong> Our team will contact you via WhatsApp. Spot held for 24 hours.
+        </div>
+        {user&&tier&&<div style={{fontSize:12,color:C.mu,padding:"8px 12px",background:C.obL,borderLeft:`2px solid ${C.gd}`}}>You will earn <strong style={{color:C.gd}}>{100*tier.mult} Vista Points</strong> on this booking.</div>}
+        <BtnG onClick={()=>{onEnquire(ev);onClose();}} full>{ev.free?"Reserve Free Spot":"Reserve My Spot"}</BtnG>
+      </div>
+    </div>
+  </TxWindow>;
+}
+
+// ─── ROOM MODAL ──────────────────────────────────────────────
+function RoomModal({room,onClose,onEnquire}) {
+  return <TxWindow accent={C.gd} bg="#0D1018" icon="🏛" title={room.name} sub={`${room.rate} · ${room.cap} pax · ${room.sqft} sq ft`} onClose={onClose}>
+    <div style={{padding:"20px 24px"}}>
+      <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:16}}>
+        {room.feat.map(f=><span key={f} style={{fontSize:10,background:C.obL,color:C.mu,padding:"4px 10px"}}>{f}</span>)}
+      </div>
+      <div style={{display:"grid",gap:11}}>
+        <Inp label="Your Name" placeholder="Full name"/>
+        <Inp label="Organisation" placeholder="Company"/>
+        <Inp label="Preferred Date" type="date"/>
+        <Sel label="Session" options={["Morning half-day 08:00–13:00","Afternoon half-day 13:00–18:00","Full day 08:00–18:00","Evening 18:00–22:00"]}/>
+        <Inp label="Expected Attendees" type="number" placeholder="20"/>
+        <Sel label="Catering" options={["No catering","Tea and Coffee break","Working lunch","Full catering package"]}/>
+        <BtnG onClick={()=>{onEnquire(room);onClose();}} full>Submit Enquiry</BtnG>
+        <p style={{fontSize:11,color:C.mu,textAlign:"center"}}>Our events team responds within 4 business hours.</p>
+      </div>
+    </div>
+  </TxWindow>;
+}
+
+// ─── COLLAPSIBLE PANEL ───────────────────────────────────────
+function Panel({id,active,onToggle,label,icon,sub,children}) {
+  return <div style={{borderBottom:`1px solid rgba(201,168,76,.1)`,overflow:"hidden"}}>
+    <button onClick={()=>onToggle(id)} style={{width:"100%",background:active===id?C.obL:C.ob,border:"none",padding:"18px 28px",display:"flex",alignItems:"center",gap:14,cursor:"pointer",transition:"background .2s",textAlign:"left"}}>
+      <span style={{fontSize:22,flexShrink:0}}>{icon}</span>
+      <div style={{flex:1}}>
+        <div style={{fontSize:14,fontWeight:500,color:active===id?C.iv:C.ivD,letterSpacing:.3}}>{label}</div>
+        {sub&&<div style={{fontSize:11,color:C.mu,marginTop:1}}>{sub}</div>}
+      </div>
+      <span style={{color:active===id?C.gd:C.mu,fontSize:20,transition:"transform .3s",transform:active===id?"rotate(90deg)":"rotate(0deg)",flexShrink:0}}>›</span>
+    </button>
+    <div style={{maxHeight:active===id?"3000px":"0",overflow:"hidden",transition:"max-height .45s ease"}}>
+      {children}
+    </div>
+  </div>;
+}
+
+// ─── MAIN APP ─────────────────────────────────────────────────
+export default function VillaVistaWebsite() {
+  const [modal,setModal]=useState(null);
+  const [user,setUser]=useState(null);
+  const [selT,setSelT]=useState(null);
+  const [notifyT,setNotifyT]=useState(null);
+  const [selEv,setSelEv]=useState(null);
+  const [selRoom,setSelRoom]=useState(null);
+  const [selVac,setSelVac]=useState(null);
+  const [showLoyalty,setShowLoyalty]=useState(false);
+  const [showDash,setShowDash]=useState(false);
+  const [toast,setToast]=useState(null);
+  const [scrolled,setScrolled]=useState(false);
+  const [drawer,setDrawer]=useState(false);
+  const [activePanel,setActivePanel]=useState(null);
+  const [catF,setCatF]=useState("All");
+  const [viewF,setViewF]=useState("all");
+  const [search,setSearch]=useState("");
+  const [igHov,setIgHov]=useState(null);
+  const [mapZ,setMapZ]=useState(null);
+
+  useEffect(()=>{const h=()=>setScrolled(window.scrollY>40);window.addEventListener("scroll",h);return()=>window.removeEventListener("scroll",h);},[]);
+
+  const say=msg=>setToast(msg);
+  const auth=u=>{setUser(u);say(`Welcome, ${(u.name||"?").split(" ")[0]}! You have earned 500 Vista Points.`);};
+  const enquire=x=>say(`Enquiry sent for ${x.name||x.title}. We will WhatsApp you within 2 hours.`);
+  const notify=t=>say(`We will notify you when ${t.name} opens.`);
+  const submitEOI=(unit,form)=>say(`EOI submitted for Unit ${unit.unit}. Our leasing team will contact ${form.name} within 24 hours.`);
+  const togglePanel=id=>setActivePanel(p=>p===id?null:id);
+  const openPanel=id=>{setActivePanel(id);document.getElementById("panels")?.scrollIntoView({behavior:"smooth"});};
+
+  const tier=getTier(user);
+  const openCount=TENANTS.filter(t=>isOpen(t)).length;
+  const cats=["All",...new Set(TENANTS.map(t=>t.cat))];
+  const visible=TENANTS.filter(t=>{
+    const cm=catF==="All"||t.cat===catF;
+    const vm=viewF==="all"||(viewF==="open"&&isOpen(t))||(viewF==="coming"&&!isOpen(t));
+    const sm=!search||[t.name,t.cat,t.desc].join(" ").toLowerCase().includes(search.toLowerCase());
+    return cm&&vm&&sm;
+  });
+
+  const navLinks=[["directory","Directory"],["vacancies","Lease a Space"],["events","Events"],["rewards","Rewards"],["conferencing","Meetings"],["map","Floor Map"]];
+  const scrollTo=id=>{document.getElementById(id)?.scrollIntoView({behavior:"smooth"});setDrawer(false);};
+
+  const floorZones=[
+    {id:"anchor",label:"Chandarana FoodPlus",x:10,y:18,w:195,h:68,tId:2,open:false},
+    {id:"tash",label:"Tash Aqua",x:215,y:18,w:155,h:68,tId:1,open:true},
+    {id:"banks",label:"KCB / Equity",x:10,y:100,w:125,h:52,tId:3,open:true},
+    {id:"ranch",label:"River Ranch",x:150,y:100,w:120,h:52,tId:11,open:true},
+    {id:"game",label:"Gamelo Gaming",x:10,y:166,w:115,h:52,tId:7,open:true},
+    {id:"elec",label:"Electronics Zone",x:140,y:166,w:130,h:52,tId:5,open:false},
+    {id:"ff",label:"Jajemelo",x:10,y:232,w:145,h:52,tId:12,open:false},
+    {id:"ret",label:"Retail",x:170,y:232,w:100,h:52,tId:13,open:false},
+    {id:"well",label:"Aura Spa / KeMU",x:10,y:298,w:175,h:52,tId:19,open:true},
+    {id:"conf",label:"Conferencing",x:200,y:298,w:70,h:52,tId:null,open:true},
+    {id:"night",label:"Night Club",x:10,y:364,w:260,h:52,tId:21,open:false},
+  ];
+
+  const LogoMark = ({h=36}) => <img src={LOGO_URI} alt="Villa Vista" style={{height:h,display:"block"}}/>;
+
+  return (
+    <div style={{minHeight:"100vh",background:C.ob,color:C.iv,fontFamily:"'Inter',sans-serif",fontWeight:300,lineHeight:1.6}}>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap"/>
+      <style>{`
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        html{scroll-behavior:smooth}
+        ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:#0D0F14}::-webkit-scrollbar-thumb{background:#C9A84C}
+        @keyframes su{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
+        .fz{fill:rgba(201,168,76,.08);stroke:rgba(201,168,76,.2);stroke-width:1;cursor:pointer;transition:fill .2s}
+        .fz:hover{fill:rgba(201,168,76,.2)}.fz.act{fill:rgba(201,168,76,.3);stroke:#C9A84C;stroke-width:1.5}.fz.dim{opacity:.35;cursor:default}
+        @media(max-width:768px){.desk{display:none!important}.hbg{display:flex!important}.hero-stats{position:static!important;margin-top:32px;flex-wrap:wrap;gap:20px}.g2{grid-template-columns:1fr!important}.g3{grid-template-columns:1fr!important}.g4{grid-template-columns:1fr 1fr!important}}
+      `}</style>
+
+      {/* ── NAV ── */}
+      <nav style={{position:"fixed",top:0,left:0,right:0,zIndex:100,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 36px",height:64,transition:"all .3s",...(scrolled?{background:"rgba(13,15,20,.98)",backdropFilter:"blur(12px)",borderBottom:`1px solid rgba(201,168,76,.12)`}:{})}}>
+        <div onClick={()=>window.scrollTo({top:0,behavior:"smooth"})} style={{cursor:"pointer"}}>
+          <LogoMark h={38}/>
+        </div>
+        <div className="desk" style={{display:"flex",gap:22,alignItems:"center"}}>
+          {navLinks.map(([id,lbl])=>(
+            <button key={id} onClick={()=>{id==="rewards"?setShowLoyalty(true):openPanel(id);}} style={{fontSize:10,letterSpacing:1.5,textTransform:"uppercase",color:activePanel===id?C.gd:C.mu,background:"none",border:"none",cursor:"pointer",transition:"color .2s"}}
+              onMouseEnter={e=>e.target.style.color=C.gd} onMouseLeave={e=>e.target.style.color=activePanel===id?C.gd:C.mu}>{lbl}</button>
+          ))}
+        </div>
+        <div style={{display:"flex",gap:9,alignItems:"center"}}>
+          {user?(
+            <div style={{display:"flex",gap:9,alignItems:"center",cursor:"pointer"}} onClick={()=>setShowLoyalty(true)}>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:9,color:C.gd,letterSpacing:1.5,textTransform:"uppercase"}}>{user.tier}</div>
+                <div style={{fontFamily:"monospace",fontSize:12,color:C.iv}}>{user.points.toLocaleString()} pts</div>
+              </div>
+              <div style={{width:34,height:34,background:C.obL,border:`1px solid ${C.gd}`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"monospace",fontSize:14,color:C.gd}}>
+                {(user.name||"?").charAt(0)}
+              </div>
+            </div>
+          ):(
+            <>
+              <button onClick={()=>setModal("login")} style={{background:"transparent",color:C.iv,border:`1px solid rgba(245,240,232,.15)`,padding:"7px 14px",fontFamily:"inherit",fontSize:10,letterSpacing:1.5,textTransform:"uppercase",cursor:"pointer"}}>Sign In</button>
+              <BtnG onClick={()=>setModal("register")} sm>Join Free</BtnG>
+            </>
+          )}
+          <button className="hbg" onClick={()=>setDrawer(true)} style={{display:"none",flexDirection:"column",gap:5,background:"none",border:"none",cursor:"pointer",padding:4}}>
+            {[0,1,2].map(i=><span key={i} style={{display:"block",width:20,height:1.5,background:C.iv}}/>)}
+          </button>
+        </div>
+      </nav>
+
+      {/* ── MOBILE DRAWER ── */}
+      {drawer&&<Overlay onClose={()=>setDrawer(false)}/>}
+      <div style={{position:"fixed",top:0,right:drawer?0:"-100%",width:"76vw",maxWidth:280,height:"100vh",background:C.obL,borderLeft:`1px solid rgba(201,168,76,.12)`,zIndex:500,transition:"right .3s ease",padding:"62px 24px 36px",display:"flex",flexDirection:"column",gap:4}}>
+        <button onClick={()=>setDrawer(false)} style={{position:"absolute",top:16,right:18,background:"none",border:"none",color:C.mu,fontSize:20,cursor:"pointer"}}>✕</button>
+        <LogoMark h={32}/>
+        <div style={{height:1,background:`rgba(201,168,76,.1)`,margin:"14px 0 6px"}}/>
+        {navLinks.map(([id,lbl])=>(
+          <button key={id} onClick={()=>{if(id==="rewards"){setShowLoyalty(true);setDrawer(false);}else{openPanel(id);setDrawer(false);}}} style={{fontSize:11,letterSpacing:2,textTransform:"uppercase",color:C.ivD,padding:"11px 0",borderBottom:`1px solid rgba(201,168,76,.06)`,background:"none",border:"none",borderBottom:`1px solid rgba(201,168,76,.06)`,textAlign:"left",cursor:"pointer"}}>{lbl}</button>
+        ))}
+        <div style={{marginTop:16,display:"grid",gap:9}}>
+          {!user&&<><BtnG onClick={()=>{setModal("register");setDrawer(false);}} full>Join Rewards</BtnG><BtnO onClick={()=>{setModal("login");setDrawer(false);}} full>Sign In</BtnO></>}
+          {user&&<BtnO onClick={()=>{setShowLoyalty(true);setDrawer(false);}} full>My Points</BtnO>}
+        </div>
+      </div>
+
+      {/* ── HERO ── */}
+      <section style={{height:"100vh",minHeight:560,background:`linear-gradient(155deg,${C.ob} 0%,#1a1208 60%,${C.ob} 100%)`,display:"flex",flexDirection:"column",justifyContent:"center",padding:"0 10vw",position:"relative",overflow:"hidden"}}>
+        <div style={{position:"absolute",inset:0,backgroundImage:`linear-gradient(rgba(201,168,76,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(201,168,76,.04) 1px,transparent 1px)`,backgroundSize:"80px 80px",pointerEvents:"none"}}/>
+        <div style={{position:"relative",zIndex:1,maxWidth:560}}>
+          {/* Logo in hero */}
+          <div style={{marginBottom:24}}><LogoMark h={54}/></div>
+          <p style={{fontSize:10,letterSpacing:3,textTransform:"uppercase",color:C.mu,marginBottom:10}}>Maua Road, Meru — Kenya</p>
+          <h1 style={{fontFamily:"Georgia,serif",fontSize:"clamp(38px,7vw,76px)",fontWeight:300,lineHeight:1.05,color:C.iv,marginBottom:16}}>
+            Where Meru<br/>comes to <em style={{fontStyle:"italic",color:C.gd}}>live</em>
+          </h1>
+          <div style={{width:40,height:1,background:C.gd,marginBottom:18}}/>
+          <p style={{maxWidth:400,fontSize:14,color:C.ivD,lineHeight:1.85,marginBottom:30}}>
+            Meru's premier lifestyle destination — retail, dining, wellness, banking, entertainment and conferencing.
+          </p>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+            <BtnG onClick={()=>setShowLoyalty(true)}>Join Vista Rewards</BtnG>
+            <BtnO onClick={()=>openPanel("vacancies")}>Lease a Space</BtnO>
+            <a href={`https://www.instagram.com/${IG1}/`} target="_blank" rel="noreferrer" style={{display:"flex",alignItems:"center",gap:7,padding:"10px 16px",background:"transparent",border:`1px solid rgba(255,255,255,.12)`,color:C.mu,textDecoration:"none",fontSize:10,letterSpacing:1.5,textTransform:"uppercase",transition:"all .2s"}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=C.gd;e.currentTarget.style.color=C.gd;}} onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(255,255,255,.12)";e.currentTarget.style.color=C.mu;}}>📸 Follow Us</a>
+          </div>
+        </div>
+        <div className="hero-stats" style={{position:"absolute",bottom:40,right:"10vw",display:"flex",gap:36}}>
+          {[["5","Dining Options"],["2","Banks"],[String(openCount),"Open Now"],["22+","Signed Tenants"]].map(([n,l])=>(
+            <div key={l}><span style={{fontFamily:"monospace",fontSize:22,color:C.gd,display:"block"}}>{n}</span><span style={{fontSize:9,letterSpacing:2,textTransform:"uppercase",color:C.mu}}>{l}</span></div>
+          ))}
+        </div>
+        <div style={{position:"absolute",bottom:36,left:"10vw",display:"flex",alignItems:"center",gap:8,cursor:"pointer"}} onClick={()=>scrollTo("panels")}>
+          <div style={{width:1,height:40,background:`linear-gradient(to bottom,transparent,${C.gd})`}}/>
+          <span style={{fontSize:9,letterSpacing:3,textTransform:"uppercase",color:C.mu}}>Explore</span>
+        </div>
+      </section>
+
+      {/* ── PANELS ── */}
+      <div id="panels" style={{background:C.ob}}>
+        <div style={{padding:"28px 36px 18px",borderBottom:`1px solid rgba(201,168,76,.08)`,display:"flex",alignItems:"center",gap:14}}>
+          <LogoMark h={28}/>
+          <div>
+            <h2 style={{fontFamily:"Georgia,serif",fontSize:"clamp(18px,2.5vw,26px)",fontWeight:300,color:C.iv}}>
+              {user?`Welcome, ${user.name.split(" ")[0]}`:"Everything in one place"}
+            </h2>
+            <p style={{fontSize:11,color:C.mu,marginTop:2}}>Tap any section to explore</p>
+          </div>
+        </div>
+
+        {/* ── DIRECTORY ── */}
+        <Panel id="directory" active={activePanel} onToggle={togglePanel} icon="🏬" label="Shops and Tenants" sub={`${openCount} open now · 22 total`}>
+          <div style={{padding:"18px 28px 26px"}}>
+            <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+              <div style={{position:"relative",flex:"1 1 150px"}}>
+                <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:C.mu,fontSize:12,pointerEvents:"none"}}>🔍</span>
+                <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search tenants…" style={{background:C.obL,border:`1px solid rgba(201,168,76,.14)`,color:C.iv,padding:"8px 12px 8px 29px",fontFamily:"inherit",fontSize:12,width:"100%",outline:"none"}}/>
+              </div>
+              {[["all","All"],["open","Open"],["coming","Soon"]].map(([v,l])=>(
+                <button key={v} onClick={()=>setViewF(v)} style={{fontSize:9,letterSpacing:1.5,textTransform:"uppercase",padding:"7px 12px",background:viewF===v?C.gd:"transparent",color:viewF===v?C.ob:C.mu,border:`1px solid ${viewF===v?C.gd:"rgba(201,168,76,.18)"}`,cursor:"pointer"}}>{l}</button>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:16}}>
+              {cats.map(c=><button key={c} onClick={()=>setCatF(c)} style={{fontSize:9,letterSpacing:1.5,textTransform:"uppercase",padding:"4px 10px",background:catF===c?C.gdD:"transparent",color:catF===c?C.gd:C.mu,border:`1px solid ${catF===c?C.gdD:"rgba(201,168,76,.07)"}`,cursor:"pointer"}}>{c}</button>)}
+            </div>
+            <div className="g3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:9}}>
+              {visible.map(t=>(
+                <div key={t.id} onClick={()=>setSelT(t)} style={{background:C.obL,border:`1px solid rgba(201,168,76,.09)`,padding:15,cursor:"pointer",transition:"border-color .2s",opacity:isOpen(t)?1:.72}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=C.gd} onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(201,168,76,.09)"}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:9}}>
+                    <span style={{fontSize:22}}>{t.e}</span><Badge t={t}/>
+                  </div>
+                  <div style={{fontSize:13,fontWeight:500,color:C.iv,marginBottom:2}}>{t.name}</div>
+                  <div style={{fontSize:9,letterSpacing:1.5,textTransform:"uppercase",color:C.mu,marginBottom:7}}>{t.cat} · {t.floor}</div>
+                  <div style={{borderTop:`1px solid rgba(201,168,76,.07)`,paddingTop:7,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span style={{fontSize:10,color:C.gdL}}>✦ {t.offer.slice(0,44)}{t.offer.length>44?"…":""}</span>
+                    {!isOpen(t)&&<span onClick={e=>{e.stopPropagation();setNotifyT(t);}} style={{fontSize:9,letterSpacing:1.5,textTransform:"uppercase",color:C.gd,background:"rgba(201,168,76,.07)",border:`1px dashed rgba(201,168,76,.22)`,padding:"2px 7px",cursor:"pointer",flexShrink:0,marginLeft:6}}>Notify</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Panel>
+
+        {/* ── VACANCIES ── */}
+        <Panel id="vacancies" active={activePanel} onToggle={togglePanel} icon="🏢" label="Lease a Space at Villa Vista" sub={`${VACANCIES.length} units available · Ground to Third floor`}>
+          <div style={{padding:"18px 28px 26px"}}>
+            <div style={{padding:"12px 16px",background:"rgba(201,168,76,.07)",border:`1px solid rgba(201,168,76,.18)`,marginBottom:18,display:"flex",gap:12,alignItems:"center"}}>
+              <span style={{fontSize:20}}>📍</span>
+              <p style={{fontSize:13,color:C.ivD,lineHeight:1.7}}>Join Meru's premier lifestyle destination. Click any unit to explore the space, view specs, and submit your Expression of Interest.</p>
+            </div>
+            <div className="g2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              {VACANCIES.map(v=>{
+                const tc={Retail:C.gd,Office:"#4CAF82","F&B Kiosk":C.tc,Professional:"#9BB5D4"}[v.type]||C.gd;
+                return <div key={v.id} onClick={()=>setSelVac(v)} style={{background:C.obL,border:`1px solid ${tc}30`,padding:16,cursor:"pointer",transition:"all .2s"}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=tc;e.currentTarget.style.transform="translateY(-1px)";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=`${tc}30`;e.currentTarget.style.transform="none";}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                    <div>
+                      <div style={{fontFamily:"monospace",fontSize:11,color:C.gd,marginBottom:2}}>{v.unit}</div>
+                      <div style={{fontSize:15,fontWeight:500,color:C.iv}}>{v.floor} Floor</div>
+                    </div>
+                    <span style={{fontSize:9,letterSpacing:1.5,textTransform:"uppercase",color:tc,background:`${tc}18`,border:`1px solid ${tc}40`,padding:"3px 8px"}}>{v.type}</span>
+                  </div>
+                  <p style={{fontSize:12,color:C.mu,lineHeight:1.65,marginBottom:10}}>{v.highlight}</p>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:`1px solid rgba(201,168,76,.07)`,paddingTop:10}}>
+                    <div>
+                      <div style={{fontFamily:"monospace",fontSize:14,color:tc}}>{fmt(v.rent)}<span style={{fontFamily:"inherit",fontSize:10,color:C.mu}}>/mo</span></div>
+                      <div style={{fontSize:10,color:C.mu}}>{v.sqft} sq ft</div>
+                    </div>
+                    <span style={{fontSize:10,letterSpacing:1.5,textTransform:"uppercase",color:tc}}>View Space →</span>
+                  </div>
+                </div>;
+              })}
+            </div>
+          </div>
+        </Panel>
+
+        {/* ── EVENTS ── */}
+        <Panel id="events" active={activePanel} onToggle={togglePanel} icon="🎪" label="Events and Activations" sub="World Cup · Jazz Night · Food Festival · Business Summit">
+          <div style={{padding:"18px 28px 26px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}} className="g2">
+            {EVENTS.map(ev=>(
+              <div key={ev.id} style={{background:C.obL,border:`1px solid rgba(201,168,76,.09)`,overflow:"hidden",transition:"border-color .2s"}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(201,168,76,.3)"} onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(201,168,76,.09)"}>
+                <div style={{height:90,background:`linear-gradient(135deg,${C.obL},#111820)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:34,borderBottom:`1px solid rgba(201,168,76,.07)`}}>{ev.e}</div>
+                <div style={{padding:"13px 15px"}}>
+                  <div style={{display:"flex",gap:7,marginBottom:7,flexWrap:"wrap",alignItems:"center"}}>
+                    <span style={{fontFamily:"monospace",fontSize:9,background:C.tc,color:"white",padding:"2px 7px"}}>{ev.date}</span>
+                    {ev.free&&<span style={{fontSize:9,color:C.ok,background:"rgba(46,204,113,.1)",padding:"2px 6px"}}>Free</span>}
+                  </div>
+                  <div style={{fontFamily:"Georgia,serif",fontSize:16,fontWeight:400,color:C.iv,marginBottom:5}}>{ev.title}</div>
+                  <p style={{fontSize:11,color:C.mu,lineHeight:1.65,marginBottom:10}}>{ev.desc}</p>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span style={{fontSize:10,color:C.mu}}>{ev.bkd}/{ev.cap} reserved</span>
+                    <BtnG sm onClick={()=>setSelEv(ev)}>{ev.free?"Reserve":"Reserve Spot"}</BtnG>
+                  </div>
+                  <div style={{background:C.ob,height:2,borderRadius:1,marginTop:8}}><div style={{background:C.gd,height:2,borderRadius:1,width:`${(ev.bkd/ev.cap)*100}%`}}/></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        {/* ── CONFERENCING ── */}
+        <Panel id="conferencing" active={activePanel} onToggle={togglePanel} icon="🏛" label="Meetings and Conferencing" sub="4 venues · from KES 8,000 · Tash Aqua catering">
+          <div className="g2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,padding:"18px 28px 26px"}}>
+            {ROOMS.map(room=>(
+              <div key={room.id} style={{background:C.obL,border:`1px solid rgba(201,168,76,.09)`,padding:16,transition:"border-color .2s",cursor:"pointer"}}
+                onClick={()=>setSelRoom(room)}
+                onMouseEnter={e=>e.currentTarget.style.borderColor=C.gd} onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(201,168,76,.09)"}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:9}}>
+                  <span style={{fontFamily:"Georgia,serif",fontSize:17,fontWeight:400,color:C.iv}}>{room.name}</span>
+                  <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
+                    <div style={{fontFamily:"monospace",fontSize:11,color:C.gd}}>{room.rate}</div>
+                    <div style={{fontSize:9,color:C.mu}}>per session</div>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:12,marginBottom:9}}>
+                  <span style={{fontSize:11,color:C.mu}}>👥 {room.cap} pax</span>
+                  <span style={{fontSize:11,color:C.mu}}>📐 {room.sqft} sqft</span>
+                </div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:11}}>
+                  {room.feat.map(f=><span key={f} style={{fontSize:9,background:C.ob,color:C.mu,padding:"2px 8px"}}>{f}</span>)}
+                </div>
+                <div style={{fontSize:10,color:C.gd,letterSpacing:1.5,textTransform:"uppercase"}}>Enquire →</div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        {/* ── INSTAGRAM ── */}
+        <Panel id="social" active={activePanel} onToggle={togglePanel} icon="📸" label="Follow Villa Vista" sub={`@${IG1} · @${IG2}`}>
+          <div style={{padding:"18px 28px 26px"}}>
+            <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+              <a href={`https://www.instagram.com/${IG1}/`} target="_blank" rel="noreferrer" style={{display:"flex",alignItems:"center",gap:8,padding:"9px 16px",background:"linear-gradient(135deg,#833AB4,#FD1D1D,#F77737)",color:"white",textDecoration:"none",fontSize:10,letterSpacing:1.5,textTransform:"uppercase",fontWeight:600}}>📸 @{IG1}</a>
+              <a href={`https://www.instagram.com/${IG2}/`} target="_blank" rel="noreferrer" style={{display:"flex",alignItems:"center",gap:8,padding:"9px 16px",background:"rgba(201,168,76,.1)",color:C.gd,textDecoration:"none",fontSize:10,letterSpacing:1.5,textTransform:"uppercase",fontWeight:600,border:`1px solid rgba(201,168,76,.25)`}}>📸 @{IG2}</a>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:2}}>
+              {IG_POSTS.map(p=>(
+                <div key={p.id} onClick={()=>window.open(`https://www.instagram.com/${IG1}/`,"_blank")} style={{aspectRatio:"1/1",background:C.obL,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",position:"relative",overflow:"hidden",border:`1px solid rgba(201,168,76,.06)`}}
+                  onMouseEnter={()=>setIgHov(p.id)} onMouseLeave={()=>setIgHov(null)}>
+                  <span style={{fontSize:26}}>{p.e}</span>
+                  <span style={{fontSize:8,letterSpacing:1,color:C.mu,marginTop:3,textTransform:"uppercase"}}>#{p.tag}</span>
+                  {igHov===p.id&&<div style={{position:"absolute",inset:0,background:"rgba(13,15,20,.9)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:8,textAlign:"center"}}>
+                    <div style={{fontSize:10,color:C.iv,lineHeight:1.5,marginBottom:4}}>{p.cap}</div>
+                    <div style={{fontSize:10,color:C.gd}}>♥ {p.likes}</div>
+                  </div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </Panel>
+
+        {/* ── MAP ── */}
+        <Panel id="map" active={activePanel} onToggle={togglePanel} icon="🗺" label="Floor Map" sub="Ground · First · Second · Third · Basement">
+          <div style={{padding:"18px 28px 26px",display:"grid",gridTemplateColumns:"1fr 200px",gap:22,alignItems:"start"}} className="g2">
+            <svg viewBox="0 0 300 440" style={{width:"100%",background:C.obL,border:`1px solid rgba(201,168,76,.1)`}}>
+              {[88,155,222,290,358].map(y=><line key={y} x1="0" y1={y} x2="300" y2={y} stroke="rgba(201,168,76,.06)" strokeWidth="1" strokeDasharray="4"/>)}
+              {[{l:"G",y:54},{l:"1",y:258},{l:"2",y:324}].map(f=><text key={f.l} x="289" y={f.y} fill={C.gdD} fontSize="8" fontFamily="monospace" textAnchor="end">FL {f.l}</text>)}
+              {floorZones.map(z=>(
+                <g key={z.id} onClick={()=>{setMapZ(z.id===mapZ?null:z.id);if(z.tId){const found=TENANTS.find(t=>t.id===z.tId);if(found)setSelT(found);}}}>
+                  <rect x={z.x} y={z.y} width={z.w} height={z.h} rx="2" className={`fz ${mapZ===z.id?"act":""} ${!z.open?"dim":""}`}/>
+                  <text x={z.x+z.w/2} y={z.y+z.h/2+4} fill={mapZ===z.id?C.gd:C.mu} fontSize="8" textAnchor="middle" fontFamily="Inter" pointerEvents="none">{z.label}</text>
+                </g>
+              ))}
+            </svg>
+            <div>
+              {[["Ground","Banking, Dining, Gaming, Electronics"],["First","Fast Food, Retail"],["Second","Wellness, Healthcare, Conferencing"],["Third","Legal and Professional"],["Basement","Parking"]].map(([f,d])=>(
+                <div key={f} style={{padding:"8px 11px",marginBottom:5,background:C.obL,borderLeft:`2px solid ${C.gdD}`}}>
+                  <div style={{fontSize:9,color:C.gd,marginBottom:1,letterSpacing:1.5,textTransform:"uppercase"}}>{f}</div>
+                  <div style={{fontSize:10,color:C.mu,lineHeight:1.5}}>{d}</div>
+                </div>
+              ))}
+              <div style={{marginTop:10,padding:"9px 11px",background:C.obL,border:`1px dashed rgba(201,168,76,.16)`,cursor:"pointer"}} onClick={()=>openPanel("vacancies")}>
+                <div style={{fontSize:9,color:C.gd,letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>Space Available</div>
+                <div style={{fontSize:10,color:C.mu,lineHeight:1.6}}>{VACANCIES.length} units for lease →</div>
+              </div>
+            </div>
+          </div>
+        </Panel>
+
+      </div>{/* end panels */}
+
+      {/* ── FOOTER ── */}
+      <footer style={{background:C.ob,borderTop:`1px solid rgba(201,168,76,.1)`,padding:"40px 10vw 22px"}}>
+        <div className="g2" style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",gap:32,marginBottom:32}}>
+          <div>
+            <LogoMark h={44}/>
+            <p style={{fontSize:12,color:C.mu,lineHeight:1.8,maxWidth:230,marginTop:14}}>Meru's premier lifestyle destination. Maua Road, opposite Kenya Methodist University.</p>
+            <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:6}}>
+              {[{href:`https://www.instagram.com/${IG1}/`,lbl:`📸 @${IG1}`},{href:`https://www.instagram.com/${IG2}/`,lbl:`📸 @${IG2}`},{href:WA,lbl:"💬 WhatsApp Us"}].map(({href,lbl})=>(
+                <a key={lbl} href={href} target="_blank" rel="noreferrer" style={{fontSize:11,color:C.mu,textDecoration:"none",transition:"color .2s"}}
+                  onMouseEnter={e=>e.currentTarget.style.color=C.gd} onMouseLeave={e=>e.currentTarget.style.color=C.mu}>{lbl}</a>
+              ))}
+            </div>
+          </div>
+          {[["Explore",["Directory","Events","Conferencing","Floor Map"]],["Leasing",["Available Units","Lease Enquiry","Fit-out Guide","Tenant Portal"]],["Contact",["Maua Road, Meru","@villavistameru","Leasing Team","Careers"]]].map(([title,links])=>(
+            <div key={title}>
+              <div style={{fontSize:9,letterSpacing:3,textTransform:"uppercase",color:C.gd,marginBottom:11}}>{title}</div>
+              {links.map(l=><div key={l} style={{fontSize:12,color:C.mu,marginBottom:8,cursor:"pointer",transition:"color .2s"}}
+                onMouseEnter={e=>e.target.style.color=C.iv} onMouseLeave={e=>e.target.style.color=C.mu}>{l}</div>)}
+            </div>
+          ))}
+        </div>
+        <div style={{height:1,background:`linear-gradient(90deg,${C.gd} 0%,transparent 100%)`,marginBottom:14}}/>
+        <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:6}}>
+          <span style={{fontSize:10,color:C.mu}}>© 2026 Villa Vista Mall, Meru. All rights reserved.</span>
+          <span style={{fontFamily:"monospace",fontSize:9,color:C.gdD}}>Shop · Dine · Experience</span>
+        </div>
+      </footer>
+
+      {/* ── WHATSAPP ── */}
+      <a href={WA} target="_blank" rel="noreferrer" style={{position:"fixed",bottom:22,right:20,zIndex:90,width:50,height:50,background:"#25D366",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,boxShadow:"0 4px 16px rgba(37,211,102,.4)",textDecoration:"none",transition:"transform .2s"}}
+        onMouseEnter={e=>e.currentTarget.style.transform="scale(1.1)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>💬</a>
+
+      {/* ── TRANSACTION WINDOWS ── */}
+      {(modal==="register"||modal==="login")&&<AuthModal mode={modal} onClose={()=>setModal(null)} onAuth={auth}/>}
+      {selT&&<TenantModal t={selT} onClose={()=>setSelT(null)} onEnquire={enquire} onNotify={notify} user={user}/>}
+      {notifyT&&<TxWindow accent={C.gd} bg="#0D1018" icon={notifyT.e} title={`${notifyT.name} — Coming Soon`} sub="We will email you when this tenant opens." onClose={()=>setNotifyT(null)}>
+        <div style={{padding:"20px 24px",display:"grid",gap:11}}>
+          <Inp label="Your Email" type="email" placeholder="you@example.com"/>
+          <BtnG onClick={()=>{notify(notifyT);setNotifyT(null);}} full>Notify Me When Open</BtnG>
+        </div>
+      </TxWindow>}
+      {selEv&&<EventModal ev={selEv} onClose={()=>setSelEv(null)} onEnquire={enquire} user={user}/>}
+      {selRoom&&<RoomModal room={selRoom} onClose={()=>setSelRoom(null)} onEnquire={enquire}/>}
+      {selVac&&<VacancyModal unit={selVac} onClose={()=>setSelVac(null)} onEOI={submitEOI}/>}
+      {showLoyalty&&<LoyaltyModal user={user} onJoin={()=>{auth({name:"New Member",email:"",phone:"",points:500,tier:"Explorer",joined:new Date().toLocaleDateString("en-KE")});}} onClose={()=>setShowLoyalty(false)} onShowDash={()=>{setShowLoyalty(false);}}/>}
+      {toast&&<Toast msg={toast} onClose={()=>setToast(null)}/>}
+    </div>
+  );
+}
